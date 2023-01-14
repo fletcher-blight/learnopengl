@@ -16,10 +16,13 @@ pub enum Error {
 }
 
 #[repr(C, packed)]
-pub struct Vertex2D {
-    pub position: [f32; 2],
+pub struct VertexND<const N: usize> {
+    pub position: [f32; N],
     pub tex_coords: [f32; 2],
 }
+
+pub type Vertex2D = VertexND<2>;
+pub type Vertex3D = VertexND<3>;
 
 #[derive(Clone)]
 pub struct Texture {
@@ -109,9 +112,9 @@ impl Texture {
 }
 
 impl Mesh {
-    pub fn new<P>(
+    pub fn new<P, const N: usize>(
         shader_program: &ShaderProgram,
-        vertices: &[Vertex2D],
+        vertices: &[VertexND<N>],
         indices: &[u32],
         textures: &[(P, &str)],
     ) -> anyhow::Result<Self>
@@ -134,7 +137,7 @@ impl Mesh {
 
             gl::BufferData(
                 gl::ARRAY_BUFFER,
-                (vertices.len() * std::mem::size_of::<Vertex2D>()) as _,
+                (vertices.len() * std::mem::size_of::<VertexND<N>>()) as _,
                 vertices.as_ptr() as _,
                 gl::STATIC_DRAW,
             );
@@ -145,14 +148,16 @@ impl Mesh {
                 gl::STATIC_DRAW,
             );
 
+            let stride = (N + 2) * std::mem::size_of::<f32>();
+
             shader_program.enable();
             gl::EnableVertexAttribArray(0);
             gl::VertexAttribPointer(
                 0,
-                2,
+                N as _,
                 gl::FLOAT,
                 gl::FALSE,
-                (4 * std::mem::size_of::<f32>()) as _,
+                stride as _,
                 std::ptr::null(),
             );
 
@@ -162,8 +167,8 @@ impl Mesh {
                 2,
                 gl::FLOAT,
                 gl::FALSE,
-                (4 * std::mem::size_of::<f32>()) as _,
-                (2 * std::mem::size_of::<f32>()) as _,
+                stride as _,
+                (N * std::mem::size_of::<f32>()) as _,
             );
 
             gl::BindVertexArray(0);
