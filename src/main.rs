@@ -1,3 +1,5 @@
+mod shader;
+
 extern crate anyhow;
 extern crate env_logger;
 extern crate gl;
@@ -7,9 +9,8 @@ extern crate log;
 extern crate sdl2;
 extern crate thiserror;
 
-use gl::types::*;
 use sdl2::event::Event;
-use std::ffi::CString;
+use shader::*;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -40,58 +41,23 @@ fn main() -> anyhow::Result<()> {
     log::info!("Window initialisation ... complete");
 
     log::info!("Compiling shaders ...");
-    let shader_program_id = unsafe {
-        let vertex_shader_id = gl::CreateShader(gl::VERTEX_SHADER);
-        let vertex_source = CString::new(VERTEX_SHADER)?;
-        gl::ShaderSource(
-            vertex_shader_id,
-            1,
-            &vertex_source.as_c_str().as_ptr() as _,
-            std::ptr::null(),
-        );
-        gl::CompileShader(vertex_shader_id);
-        check_compile(vertex_shader_id)?;
-
-        let fragment_shader_id = gl::CreateShader(gl::FRAGMENT_SHADER);
-        let fragment_source = CString::new(FRAGMENT_SHADER)?;
-        gl::ShaderSource(
-            fragment_shader_id,
-            1,
-            &fragment_source.as_c_str().as_ptr() as _,
-            std::ptr::null(),
-        );
-        gl::CompileShader(fragment_shader_id);
-        check_compile(fragment_shader_id)?;
-
-        let shader_program_id = gl::CreateProgram();
-        gl::AttachShader(shader_program_id, vertex_shader_id);
-        gl::AttachShader(shader_program_id, fragment_shader_id);
-        gl::LinkProgram(shader_program_id);
-        check_link(shader_program_id)?;
-
-        gl::DetachShader(shader_program_id, fragment_shader_id);
-        gl::DetachShader(shader_program_id, vertex_shader_id);
-        gl::DeleteShader(fragment_shader_id);
-        gl::DeleteShader(vertex_shader_id);
-
-        shader_program_id
-    };
+    let shader_program = ShaderProgram::new(
+        &Shader::new(include_str!("../assets/shader.vert"), gl::VERTEX_SHADER)?,
+        &Shader::new(include_str!("../assets/shader.frag"), gl::FRAGMENT_SHADER)?,
+    )?;
     log::info!("Compiling shaders ... complete");
 
     log::info!("Loading Assets ...");
-
     #[rustfmt::skip]
     let vertices = [
-        -0.5, -0.5,
-        -0.5, 0.5,
-        0.5, 0.5,
-        0.5, -0.5f32,
+        -0.5, -0.5, 1.0, 0.0, 0.0,
+        0.0, 0.5, 0.0, 1.0, 0.0,
+        0.5, -0.5, 0.0, 0.0, 1.0f32,
     ];
 
     #[rustfmt::skip]
     let indices = [
         0, 1, 2,
-        0, 2, 3u32
     ];
 
     let vao = unsafe {
@@ -120,14 +86,25 @@ fn main() -> anyhow::Result<()> {
             gl::STATIC_DRAW,
         );
 
+        shader_program.enable();
         gl::EnableVertexAttribArray(0);
         gl::VertexAttribPointer(
             0,
             2,
             gl::FLOAT,
             gl::FALSE,
-            (2 * std::mem::size_of::<f32>()) as _,
+            (5 * std::mem::size_of::<f32>()) as _,
             std::ptr::null(),
+        );
+
+        gl::EnableVertexAttribArray(1);
+        gl::VertexAttribPointer(
+            1,
+            3,
+            gl::FLOAT,
+            gl::FALSE,
+            (5 * std::mem::size_of::<f32>()) as _,
+            (2 * std::mem::size_of::<f32>()) as _,
         );
 
         gl::BindVertexArray(0);
@@ -141,9 +118,9 @@ fn main() -> anyhow::Result<()> {
         unsafe {
             gl::ClearColor(0.2, 0.3, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            gl::UseProgram(shader_program_id);
+            shader_program.enable();
             gl::BindVertexArray(vao);
-            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, std::ptr::null());
+            gl::DrawElements(gl::TRIANGLES, 3, gl::UNSIGNED_INT, std::ptr::null());
         }
 
         window.gl_swap_window();
@@ -157,81 +134,4 @@ fn main() -> anyhow::Result<()> {
 
     log::info!("Goodbye");
     Ok(())
-}
-
-const VERTEX_SHADER: &str = r#"
-#version 330 core
-
-layout (location = 0) in vec2 position;
-
-void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
-}
-"#;
-
-const FRAGMENT_SHADER: &str = r#"
-#version 330 core
-
-out vec4 colour;
-
-void main() {
-    colour = vec4(1.0, 0.0, 0.0, 1.0);
-}
-"#;
-
-fn check_compile(id: GLuint) -> anyhow::Result<()> {
-    let mut success: GLint = 0;
-    unsafe {
-        gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
-    }
-    if success != gl::FALSE as i32 {
-        return Ok(());
-    }
-
-    let mut length: GLint = 0;
-    unsafe {
-        gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut length);
-    }
-
-    let error = create_space_allocated_cstring(length as usize)?;
-    unsafe {
-        gl::GetShaderInfoLog(
-            id,
-            length,
-            std::ptr::null_mut(),
-            error.as_ptr() as *mut GLchar,
-        );
-    }
-    anyhow::bail!(error.to_string_lossy().into_owned())
-}
-
-fn check_link(id: GLuint) -> anyhow::Result<()> {
-    let mut success: GLint = 0;
-    unsafe {
-        gl::GetProgramiv(id, gl::LINK_STATUS, &mut success);
-    }
-    if success != gl::FALSE as i32 {
-        return Ok(());
-    }
-
-    let mut length: GLint = 0;
-    unsafe {
-        gl::GetProgramiv(id, gl::INFO_LOG_LENGTH, &mut length);
-    }
-
-    let error = create_space_allocated_cstring(length as usize)?;
-    unsafe {
-        gl::GetProgramInfoLog(
-            id,
-            length,
-            std::ptr::null_mut(),
-            error.as_ptr() as *mut GLchar,
-        );
-    }
-    anyhow::bail!(error.to_string_lossy().into_owned())
-}
-
-fn create_space_allocated_cstring(length: usize) -> anyhow::Result<CString> {
-    let space = " ".repeat(length);
-    Ok(CString::new(space)?)
 }
