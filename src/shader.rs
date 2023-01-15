@@ -13,6 +13,12 @@ pub enum Error {
     Link(String),
 }
 
+pub enum ShaderType {
+    Vertex,
+    Geometry,
+    Fragment,
+}
+
 pub struct Shader {
     id: GLuint,
 }
@@ -38,9 +44,9 @@ impl Drop for ShaderProgram {
 }
 
 impl Shader {
-    pub fn new(source: &str, shader_type: GLenum) -> anyhow::Result<Self> {
+    pub fn new(source: &str, shader_type: ShaderType) -> anyhow::Result<Self> {
         let id = unsafe {
-            let id = gl::CreateShader(shader_type);
+            let id = gl::CreateShader(shader_type.into());
             let source_str = CString::new(source)?;
             gl::ShaderSource(
                 id,
@@ -82,14 +88,20 @@ impl Shader {
 }
 
 impl ShaderProgram {
-    pub fn new(vertex_shader: &Shader, fragment_shader: &Shader) -> anyhow::Result<Self> {
+    pub fn new(shaders: &[Shader]) -> anyhow::Result<Self> {
         let id = unsafe {
             let id = gl::CreateProgram();
-            gl::AttachShader(id, vertex_shader.id);
-            gl::AttachShader(id, fragment_shader.id);
+
+            for shader in shaders {
+                gl::AttachShader(id, shader.id);
+            }
+
             gl::LinkProgram(id);
-            gl::DetachShader(id, fragment_shader.id);
-            gl::DetachShader(id, vertex_shader.id);
+
+            for shader in shaders {
+                gl::DetachShader(id, shader.id);
+            }
+
             id
         };
 
@@ -129,5 +141,15 @@ impl ShaderProgram {
         let name_cstr = CString::new(name)?;
         let id = unsafe { gl::GetUniformLocation(self.id, name_cstr.as_c_str().as_ptr() as _) };
         Ok(id)
+    }
+}
+
+impl From<ShaderType> for GLenum {
+    fn from(value: ShaderType) -> Self {
+        match value {
+            ShaderType::Vertex => gl::VERTEX_SHADER,
+            ShaderType::Geometry => gl::GEOMETRY_SHADER,
+            ShaderType::Fragment => gl::FRAGMENT_SHADER,
+        }
     }
 }

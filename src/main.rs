@@ -36,25 +36,56 @@ fn main() -> anyhow::Result<()> {
     log::info!("Window initialisation ... complete");
 
     log::info!("Compiling shaders ...");
-    let shader_program = ShaderProgram::new(
-        &Shader::new(include_str!("../assets/shader.vert"), gl::VERTEX_SHADER)?,
-        &Shader::new(include_str!("../assets/shader.frag"), gl::FRAGMENT_SHADER)?,
-    )?;
+    // let skybox_shader_program = ShaderProgram::new(&[
+    //     Shader::new(
+    //         include_str!("../assets/shaders/skybox.vert"),
+    //         ShaderType::Vertex,
+    //     )?,
+    //     Shader::new(
+    //         include_str!("../assets/shaders/skybox.frag"),
+    //         ShaderType::Fragment,
+    //     )?,
+    // ])?;
+
+    let shader_program = ShaderProgram::new(&[
+        Shader::new(
+            include_str!("../assets/shaders/shader.vert"),
+            ShaderType::Vertex,
+        )?,
+        Shader::new(
+            include_str!("../assets/shaders/shader.frag"),
+            ShaderType::Fragment,
+        )?,
+    ])?;
     log::info!("Compiling shaders ... complete");
 
     log::info!("Loading assets ...");
-    let mesh = Mesh::new(
-        &shader_program,
-        &cube::VERTICES,
-        &cube::INDICES,
-        &[
-            (
-                std::env::current_dir()?.join("assets/splatoon-face.jpeg"),
-                "tex1",
-            ),
-            (std::env::current_dir()?.join("assets/ship_C.png"), "tex2"),
-        ],
-    )?;
+    let mesh = Mesh::new(&shader_program, &cube::INDICES, &cube::VERTICES)?;
+
+    let asset_dir = std::env::current_dir()?.join("assets");
+    let image_dir = asset_dir.join("images");
+    // let skybox_dir = asset_dir.join("skyboxes");
+    let _textures = [
+        Texture::from_file_2d(
+            &shader_program,
+            "tex1",
+            0,
+            image_dir.join("splatoon-face.jpeg"),
+        )?,
+        Texture::from_file_2d(&shader_program, "tex2", 1, image_dir.join("ship_C.png"))?,
+        // Texture::from_file_cubemap(
+        //     &skybox_shader_program,
+        //     "skybox",
+        //     CubeMap {
+        //         right: skybox_dir.join("right.jpg"),
+        //         left: skybox_dir.join("left.jpg"),
+        //         top: skybox_dir.join("top.jpg"),
+        //         bottom: skybox_dir.join("bottom.jpg"),
+        //         back: skybox_dir.join("back.jpg"),
+        //         front: skybox_dir.join("front.jpg"),
+        //     },
+        // )?,
+    ];
     log::info!("Loading assets ... complete");
 
     log::info!("Initialising game logic ...");

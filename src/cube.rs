@@ -1,105 +1,128 @@
-use crate::assets::Vertex3D;
+use crate::assets::{Attribute, AttributeType};
 
-pub const VERTICES: [Vertex3D; 24] = [
+#[repr(C, packed)]
+pub struct Vertex {
+    position: [f32; 3],
+    tex_coords: [f32; 2],
+}
+
+const ATTRIBUTES: [Attribute; 2] = [
+    Attribute {
+        attribute_type: AttributeType::F32,
+        count: 3,
+    },
+    Attribute {
+        attribute_type: AttributeType::F32,
+        count: 2,
+    },
+];
+
+impl crate::Vertex for Vertex {
+    fn attributes() -> &'static [Attribute] {
+        &ATTRIBUTES
+    }
+}
+
+pub const VERTICES: [Vertex; 24] = [
     // Front
-    Vertex3D {
+    Vertex {
         position: [-0.5, -0.5, 0.5],
         tex_coords: [0.0, 0.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, 0.5, 0.5],
         tex_coords: [0.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, 0.5, 0.5],
         tex_coords: [1.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, -0.5, 0.5],
         tex_coords: [1.0, 0.0],
     },
     // Left
-    Vertex3D {
+    Vertex {
         position: [-0.5, -0.5, -0.5],
         tex_coords: [0.0, 0.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, 0.5, -0.5],
         tex_coords: [0.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, 0.5, 0.5],
         tex_coords: [1.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, -0.5, 0.5],
         tex_coords: [1.0, 0.0],
     },
     // Top
-    Vertex3D {
+    Vertex {
         position: [-0.5, 0.5, 0.5],
         tex_coords: [0.0, 0.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, 0.5, -0.5],
         tex_coords: [0.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, 0.5, -0.5],
         tex_coords: [1.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, 0.5, 0.5],
         tex_coords: [1.0, 0.0],
     },
     // Right
-    Vertex3D {
+    Vertex {
         position: [0.5, -0.5, 0.5],
         tex_coords: [0.0, 0.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, 0.5, 0.5],
         tex_coords: [0.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, 0.5, -0.5],
         tex_coords: [1.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, -0.5, -0.5],
         tex_coords: [1.0, 0.0],
     },
     // Bottom
-    Vertex3D {
+    Vertex {
         position: [-0.5, -0.5, -0.5],
         tex_coords: [0.0, 0.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, -0.5, 0.5],
         tex_coords: [0.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, -0.5, 0.5],
         tex_coords: [1.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, -0.5, -0.5],
         tex_coords: [1.0, 0.0],
     },
     // Rear
-    Vertex3D {
+    Vertex {
         position: [-0.5, -0.5, -0.5],
         tex_coords: [0.0, 0.0],
     },
-    Vertex3D {
+    Vertex {
         position: [-0.5, 0.5, -0.5],
         tex_coords: [0.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, 0.5, -0.5],
         tex_coords: [1.0, 1.0],
     },
-    Vertex3D {
+    Vertex {
         position: [0.5, -0.5, -0.5],
         tex_coords: [1.0, 0.0],
     },
