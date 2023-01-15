@@ -17,7 +17,7 @@ pub enum Error {
 
 #[derive(Clone)]
 pub struct Texture {
-    id: GLuint,
+    pub(crate) id: GLuint,
 }
 
 pub struct CubeMap<Data> {
@@ -29,11 +29,17 @@ pub struct CubeMap<Data> {
     pub front: Data,
 }
 
-pub struct Mesh {
+pub struct IndexedMesh {
     vao: GLuint,
     vbo: GLuint,
     ebo: GLuint,
     num_indices: usize,
+}
+
+pub struct PointsMesh {
+    vao: GLuint,
+    vbo: GLuint,
+    num_points: usize,
 }
 
 pub trait Vertex {
@@ -59,10 +65,19 @@ impl Drop for Texture {
     }
 }
 
-impl Drop for Mesh {
+impl Drop for IndexedMesh {
     fn drop(&mut self) {
         unsafe {
             gl::DeleteBuffers(1, &self.ebo);
+            gl::DeleteBuffers(1, &self.vbo);
+            gl::DeleteVertexArrays(1, &self.vao);
+        }
+    }
+}
+
+impl Drop for PointsMesh {
+    fn drop(&mut self) {
+        unsafe {
             gl::DeleteBuffers(1, &self.vbo);
             gl::DeleteVertexArrays(1, &self.vao);
         }
@@ -127,8 +142,8 @@ impl Texture {
             texture_filenames.left,
             texture_filenames.top,
             texture_filenames.bottom,
-            texture_filenames.back,
             texture_filenames.front,
+            texture_filenames.back,
         ];
 
         let texture_images: Vec<_> = filenames
@@ -137,12 +152,11 @@ impl Texture {
             .collect::<anyhow::Result<_>>()?;
 
         shader_program.enable();
-        let texture_location = shader_program.locate_uniform(texture_shader_name)?;
+        // let texture_location = shader_program.locate_uniform(texture_shader_name)?;
 
         let mut id = 0;
         unsafe {
             gl::GenTextures(1, &mut id);
-            // gl::ActiveTexture(gl::TEXTURE0 + index);
             gl::BindTexture(gl::TEXTURE_CUBE_MAP, id);
 
             gl::TexParameteri(
@@ -187,7 +201,7 @@ impl Texture {
                     texture_image.as_bytes().as_ptr() as _,
                 );
 
-                gl::Uniform1i(texture_location, index as _);
+                // gl::Uniform1i(texture_location, index as _);
             }
         }
 
@@ -199,8 +213,8 @@ impl Texture {
         P: AsRef<Path>,
     {
         let texture_image = image::open(&texture_filename)
-            .with_context(|| format!("Could not open image {:?}", texture_filename.as_ref()))?
-            .flipv();
+            .with_context(|| format!("Could not open image {:?}", texture_filename.as_ref()))?;
+        // .flipv();
 
         let texture_colour_type = match texture_image.color() {
             ColorType::Rgb8 => gl::RGB,
@@ -215,7 +229,7 @@ impl Texture {
     }
 }
 
-impl Mesh {
+impl IndexedMesh {
     pub fn new<Vertex>(
         shader_program: &ShaderProgram,
         indices: &[u32],
@@ -278,7 +292,7 @@ impl Mesh {
             gl::BindVertexArray(0);
         };
 
-        Ok(Mesh {
+        Ok(IndexedMesh {
             vao,
             vbo,
             ebo,
@@ -295,6 +309,74 @@ impl Mesh {
                 gl::UNSIGNED_INT,
                 std::ptr::null(),
             );
+        }
+    }
+}
+
+impl PointsMesh {
+    pub fn new<Vertex>(shader_program: &ShaderProgram, vertices: &[Vertex]) -> anyhow::Result<Self>
+    where
+        Vertex: crate::Vertex,
+    {
+        let attributes = Vertex::attributes();
+        let stride: usize = attributes
+            .iter()
+            .map(|attribute| attribute.count * attribute.attribute_type.num_bytes())
+            .sum();
+
+        shader_program.enable();
+
+        let mut vao = 0;
+        let mut vbo = 0;
+        unsafe {
+            gl::GenVertexArrays(1, &mut vao);
+            gl::GenBuffers(1, &mut vbo);
+
+            gl::BindVertexArray(vao);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                (vertices.len() * std::mem::size_of::<Vertex>()) as _,
+                vertices.as_ptr() as _,
+                gl::STATIC_DRAW,
+            );
+
+            let mut offset = 0;
+            for (index, attribute) in attributes.iter().enumerate() {
+                gl::EnableVertexAttribArray(index as _);
+                gl::VertexAttribPointer(
+                    index as _,
+                    attribute.count as _,
+                    attribute.attribute_type.into(),
+                    gl::FALSE,
+                    stride as _,
+                    offset as _,
+                );
+
+                offset += attribute.count * attribute.attribute_type.num_bytes();
+            }
+
+            gl::BindVertexArray(0);
+        };
+
+        let num_points = vertices.len()
+            * attributes
+                .iter()
+                .map(|attribute| attribute.count)
+                .sum::<usize>();
+
+        Ok(PointsMesh {
+            vao,
+            vbo,
+            num_points,
+        })
+    }
+
+    pub fn draw(&self) {
+        unsafe {
+            gl::BindVertexArray(self.vao);
+            gl::DrawArrays(gl::TRIANGLES, 0, self.num_points as _);
         }
     }
 }

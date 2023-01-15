@@ -138,6 +138,7 @@ impl ShaderProgram {
     }
 
     pub fn locate_uniform(&self, name: &str) -> anyhow::Result<GLint> {
+        self.enable();
         let name_cstr = CString::new(name)?;
         let id = unsafe { gl::GetUniformLocation(self.id, name_cstr.as_c_str().as_ptr() as _) };
         Ok(id)

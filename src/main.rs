@@ -2,6 +2,7 @@ mod assets;
 mod camera;
 mod cube;
 mod shader;
+mod skybox;
 mod window;
 
 extern crate anyhow;
@@ -36,63 +37,79 @@ fn main() -> anyhow::Result<()> {
     log::info!("Window initialisation ... complete");
 
     log::info!("Compiling shaders ...");
-    // let skybox_shader_program = ShaderProgram::new(&[
+
+    // let cube_shader_program = ShaderProgram::new(&[
     //     Shader::new(
-    //         include_str!("../assets/shaders/skybox.vert"),
+    //         include_str!("../assets/shaders/cube.vert"),
     //         ShaderType::Vertex,
     //     )?,
     //     Shader::new(
-    //         include_str!("../assets/shaders/skybox.frag"),
+    //         include_str!("../assets/shaders/cube.frag"),
     //         ShaderType::Fragment,
     //     )?,
     // ])?;
 
-    let shader_program = ShaderProgram::new(&[
+    let skybox_shader_program = ShaderProgram::new(&[
         Shader::new(
-            include_str!("../assets/shaders/shader.vert"),
+            include_str!("../assets/shaders/skybox.vert"),
             ShaderType::Vertex,
         )?,
         Shader::new(
-            include_str!("../assets/shaders/shader.frag"),
+            include_str!("../assets/shaders/skybox.frag"),
             ShaderType::Fragment,
         )?,
     ])?;
+
     log::info!("Compiling shaders ... complete");
 
     log::info!("Loading assets ...");
-    let mesh = Mesh::new(&shader_program, &cube::INDICES, &cube::VERTICES)?;
+
+    // let cube_mesh = IndexedMesh::new(&cube_shader_program, &cube::INDICES, &cube::VERTICES)?;
+    let skybox_mesh = PointsMesh::new(&skybox_shader_program, &skybox::VERTICES)?;
 
     let asset_dir = std::env::current_dir()?.join("assets");
     let image_dir = asset_dir.join("images");
-    // let skybox_dir = asset_dir.join("skyboxes");
+    let skybox_dir = asset_dir.join("skyboxes");
+
     let _textures = [
-        Texture::from_file_2d(
-            &shader_program,
-            "tex1",
-            0,
-            image_dir.join("splatoon-face.jpeg"),
-        )?,
-        Texture::from_file_2d(&shader_program, "tex2", 1, image_dir.join("ship_C.png"))?,
-        // Texture::from_file_cubemap(
-        //     &skybox_shader_program,
-        //     "skybox",
-        //     CubeMap {
-        //         right: skybox_dir.join("right.jpg"),
-        //         left: skybox_dir.join("left.jpg"),
-        //         top: skybox_dir.join("top.jpg"),
-        //         bottom: skybox_dir.join("bottom.jpg"),
-        //         back: skybox_dir.join("back.jpg"),
-        //         front: skybox_dir.join("front.jpg"),
-        //     },
+        // Texture::from_file_2d(
+        //     &cube_shader_program,
+        //     "tex1",
+        //     0,
+        //     image_dir.join("splatoon-face.jpeg"),
         // )?,
+        // Texture::from_file_2d(
+        //     &cube_shader_program,
+        //     "tex2",
+        //     1,
+        //     image_dir.join("ship_C.png"),
+        // )?,
+        Texture::from_file_cubemap(
+            &skybox_shader_program,
+            "skybox",
+            CubeMap {
+                right: skybox_dir.join("right.jpg"),
+                left: skybox_dir.join("left.jpg"),
+                top: skybox_dir.join("top.jpg"),
+                bottom: skybox_dir.join("bottom.jpg"),
+                back: skybox_dir.join("back.jpg"),
+                front: skybox_dir.join("front.jpg"),
+            },
+        )?,
     ];
+
     log::info!("Loading assets ... complete");
 
     log::info!("Initialising game logic ...");
 
-    let model_location = shader_program.locate_uniform("model")?;
-    let view_location = shader_program.locate_uniform("view")?;
-    let projection_location = shader_program.locate_uniform("projection")?;
+    // let cube_model_location = cube_shader_program.locate_uniform("model")?;
+    // let cube_view_location = cube_shader_program.locate_uniform("view")?;
+    // let cube_projection_location = cube_shader_program.locate_uniform("projection")?;
+
+    let skybox_view_location = skybox_shader_program.locate_uniform("view")?;
+    let skybox_projection_location = skybox_shader_program.locate_uniform("projection")?;
+
+    log::debug!("Skybox View {skybox_view_location} and Projection {skybox_projection_location}");
 
     const CAMERA_ACCELERATION: f32 = 100.0;
     const CAMERA_DRAG: f32 = 0.98;
@@ -152,21 +169,31 @@ fn main() -> anyhow::Result<()> {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
-        shader_program.enable();
+        let camera_view = camera.calculate_view();
+        let camera_projection = camera.calculate_projection(window_size);
 
-        set_uniform_mat4(view_location, &camera.calculate_view());
+        // cube_shader_program.enable();
+        // set_uniform_mat4(cube_view_location, &camera_view);
+        // set_uniform_mat4(cube_projection_location, &camera_projection);
+        // for (position, orbit, rotation) in &cubes {
+        //     set_uniform_mat4(
+        //         cube_model_location,
+        //         &calculate_model(total_passed_seconds, position, orbit, rotation),
+        //     );
+        //     cube_mesh.draw();
+        // }
+
+        unsafe { gl::DepthFunc(gl::LEQUAL) };
+        unsafe { gl::DepthMask(gl::FALSE) };
+        skybox_shader_program.enable();
         set_uniform_mat4(
-            projection_location,
-            &camera.calculate_projection(window_size),
+            skybox_view_location,
+            &glm::mat3_to_mat4(&glm::mat4_to_mat3(&camera_view)),
         );
-
-        for (position, orbit, rotation) in &cubes {
-            set_uniform_mat4(
-                model_location,
-                &calculate_model(total_passed_seconds, position, orbit, rotation),
-            );
-            mesh.draw();
-        }
+        set_uniform_mat4(skybox_projection_location, &camera_projection);
+        skybox_mesh.draw();
+        unsafe { gl::DepthMask(gl::TRUE) };
+        unsafe { gl::DepthFunc(gl::LESS) };
 
         last_frame_instant = current_frame_instant;
     })
