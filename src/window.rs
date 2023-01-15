@@ -26,6 +26,8 @@ pub use sdl2::keyboard::Keycode;
 pub enum Event {
     KeyUp(Keycode),
     KeyDown(Keycode),
+    MousePosition(f32, f32),
+    MouseScroll(f32),
 }
 
 impl Window {
@@ -37,6 +39,7 @@ impl Window {
             gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
             gl_attr.set_context_version(3, 3);
         }
+        sdl.mouse().set_relative_mouse_mode(true);
         let window = video
             .window(title, width, height)
             .opengl()
@@ -55,19 +58,14 @@ impl Window {
         })
     }
 
-    pub fn run<F>(self, game_logic: F) -> anyhow::Result<()>
+    pub fn run<F>(self, mut game_logic: F) -> anyhow::Result<()>
     where
-        F: Fn(f32, (u32, u32), &[Event]),
+        F: FnMut((u32, u32), &[Event]),
     {
         let mut events = Vec::with_capacity(50);
         let mut event_pump = self.sdl.event_pump().map_err(Error::SDL)?;
 
-        let start_time = std::time::Instant::now();
         'main: loop {
-            let passed_time = std::time::Instant::now()
-                .duration_since(start_time)
-                .as_secs_f32();
-
             events.clear();
             for event in event_pump.poll_iter() {
                 match event {
@@ -90,11 +88,15 @@ impl Window {
                         keycode: Some(keycode),
                         ..
                     } => events.push(Event::KeyDown(keycode)),
+                    SdlEvent::MouseMotion { xrel, yrel, .. } => {
+                        events.push(Event::MousePosition(xrel as f32, yrel as f32))
+                    }
+                    SdlEvent::MouseWheel { y, .. } => events.push(Event::MouseScroll(y as f32)),
                     _ => {}
                 }
             }
 
-            game_logic(passed_time, self.window.size(), &events);
+            game_logic(self.window.size(), &events);
 
             self.window.gl_swap_window();
         }

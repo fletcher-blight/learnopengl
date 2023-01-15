@@ -14,9 +14,18 @@ use assets::*;
 use camera::Camera;
 use gl::types::GLint;
 use nalgebra_glm as glm;
+use rand::prelude::ThreadRng;
 use rand::Rng;
 use shader::*;
 use window::*;
+
+#[derive(Default)]
+struct CameraControls {
+    left: f32,
+    right: f32,
+    forward: f32,
+    backward: f32,
+}
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -54,23 +63,59 @@ fn main() -> anyhow::Result<()> {
     let view_location = shader_program.locate_uniform("view")?;
     let projection_location = shader_program.locate_uniform("projection")?;
 
-    let camera = Camera::new();
+    const CAMERA_ACCELERATION: f32 = 100.0;
+    const CAMERA_DRAG: f32 = 0.98;
+    let mut camera = Camera::new();
+    let mut camera_controls = CameraControls::default();
 
-    let cube_positions: Vec<_> = std::iter::repeat_with(|| {
-        glm::vec3(
-            rng.gen_range(-3.0..3.0),
-            rng.gen_range(-3.0..3.0),
-            rng.gen_range(-5.0..5.0),
-        )
-    })
-    .filter(|pos| *pos != glm::vec3(0.0, 0.0, 0.0))
-    .take(10)
-    .collect();
+    let cubes: Vec<_> = create_random_vectors(1000, &mut rng)
+        .into_iter()
+        .zip(create_random_vectors(1000, &mut rng).into_iter())
+        .zip(create_random_vectors(1000, &mut rng).into_iter())
+        .map(|((position, orbit), rotation)| (position, orbit, rotation))
+        .collect();
 
     log::info!("Initialising game logic ... complete");
 
     log::info!("Game loop");
-    window.run(|passed_time, window_size, _events| {
+
+    let start_instant = std::time::Instant::now();
+    let mut last_frame_instant = start_instant;
+    let mut current_frame_instant = start_instant;
+
+    window.run(|window_size, events| {
+        current_frame_instant = std::time::Instant::now();
+        let seconds_since_last_frame = current_frame_instant
+            .duration_since(last_frame_instant)
+            .as_secs_f32();
+        let total_passed_seconds = current_frame_instant
+            .duration_since(start_instant)
+            .as_secs_f32();
+
+        for event in events {
+            match event {
+                Event::KeyUp(Keycode::W) => camera_controls.forward = 0.0,
+                Event::KeyUp(Keycode::S) => camera_controls.backward = 0.0,
+                Event::KeyUp(Keycode::A) => camera_controls.left = 0.0,
+                Event::KeyUp(Keycode::D) => camera_controls.right = 0.0,
+                Event::KeyUp(_) => {}
+                Event::KeyDown(Keycode::W) => camera_controls.forward = CAMERA_ACCELERATION,
+                Event::KeyDown(Keycode::S) => camera_controls.backward = CAMERA_ACCELERATION,
+                Event::KeyDown(Keycode::A) => camera_controls.left = CAMERA_ACCELERATION,
+                Event::KeyDown(Keycode::D) => camera_controls.right = CAMERA_ACCELERATION,
+                Event::KeyDown(_) => {}
+                Event::MousePosition(xrel, yrel) => {
+                    camera.move_orientation(*xrel * 0.1, *yrel * 0.1)
+                }
+                Event::MouseScroll(offset) => camera.zoom(*offset * 10.0, seconds_since_last_frame),
+            }
+        }
+        camera.move_position(
+            camera_controls.calculate_force(),
+            CAMERA_DRAG,
+            seconds_since_last_frame,
+        );
+
         unsafe {
             gl::ClearColor(0.2, 0.3, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
@@ -84,10 +129,15 @@ fn main() -> anyhow::Result<()> {
             &camera.calculate_projection(window_size),
         );
 
-        for cube_position in &cube_positions {
-            set_uniform_mat4(model_location, &calculate_model(passed_time, cube_position));
+        for (position, orbit, rotation) in &cubes {
+            set_uniform_mat4(
+                model_location,
+                &calculate_model(total_passed_seconds, position, orbit, rotation),
+            );
             mesh.draw();
         }
+
+        last_frame_instant = current_frame_instant;
     })
 }
 
@@ -95,17 +145,40 @@ fn set_uniform_mat4(uniform_location: GLint, mat: &glm::Mat4) {
     unsafe { gl::UniformMatrix4fv(uniform_location, 1, gl::FALSE, glm::value_ptr(mat).as_ptr()) }
 }
 
-fn calculate_model(passed_time: f32, cube_position: &glm::Vec3) -> glm::Mat4 {
+fn calculate_model(
+    total_passed_seconds: f32,
+    position: &glm::Vec3,
+    orbit: &glm::Vec3,
+    rotation: &glm::Vec3,
+) -> glm::Mat4 {
     glm::rotate(
         &glm::translate(
             &glm::rotate(
                 &glm::one(),
-                (passed_time * 30.0).to_radians(),
-                &glm::vec3(1.0, 1.0, 1.0),
+                (total_passed_seconds * 20.0).to_radians(),
+                &orbit,
             ),
-            cube_position,
+            position,
         ),
-        (passed_time * 50.0).to_radians(),
-        cube_position,
+        (total_passed_seconds * 120.0).to_radians(),
+        rotation,
     )
+}
+
+impl CameraControls {
+    fn calculate_force(&self) -> glm::Vec3 {
+        glm::vec3(self.right - self.left, 0.0, self.forward - self.backward)
+    }
+}
+
+fn create_random_vectors(n: usize, rng: &mut ThreadRng) -> Vec<glm::Vec3> {
+    std::iter::repeat_with(|| {
+        glm::vec3(
+            rng.gen_range(-100.0..100.0),
+            rng.gen_range(-100.0..100.0),
+            rng.gen_range(-100.0..100.0),
+        )
+    })
+    .take(n)
+    .collect()
 }
