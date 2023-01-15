@@ -34,12 +34,14 @@ pub struct IndexedMesh {
     vbo: GLuint,
     ebo: GLuint,
     num_indices: usize,
+    textures: Vec<Texture>,
 }
 
 pub struct PointsMesh {
     vao: GLuint,
     vbo: GLuint,
     num_points: usize,
+    textures: Vec<Texture>,
 }
 
 pub trait Vertex {
@@ -94,10 +96,8 @@ impl Texture {
     where
         P: AsRef<Path>,
     {
-        let (texture_image, texture_colour_type) = Texture::load_image_file(texture_filename)?;
-
-        shader_program.enable();
-        let texture_location = shader_program.locate_uniform(texture_shader_name)?;
+        let (texture_image, texture_colour_type) =
+            Texture::load_image_file(texture_filename, true)?;
 
         let mut id = 0;
         unsafe {
@@ -122,9 +122,10 @@ impl Texture {
                 texture_image.as_bytes().as_ptr() as _,
             );
             gl::GenerateMipmap(gl::TEXTURE_2D);
-
-            gl::Uniform1i(texture_location, index as _);
         };
+
+        let texture_location = shader_program.locate_uniform(texture_shader_name)?;
+        unsafe { gl::Uniform1i(texture_location, index as _) };
 
         Ok(Texture { id })
     }
@@ -132,6 +133,7 @@ impl Texture {
     pub fn from_file_cubemap<P>(
         shader_program: &ShaderProgram,
         texture_shader_name: &str,
+        index: u32,
         texture_filenames: CubeMap<P>,
     ) -> anyhow::Result<Self>
     where
@@ -148,11 +150,8 @@ impl Texture {
 
         let texture_images: Vec<_> = filenames
             .iter()
-            .map(Texture::load_image_file)
+            .map(|path| Texture::load_image_file(path, false))
             .collect::<anyhow::Result<_>>()?;
-
-        shader_program.enable();
-        // let texture_location = shader_program.locate_uniform(texture_shader_name)?;
 
         let mut id = 0;
         unsafe {
@@ -200,21 +199,30 @@ impl Texture {
                     gl::UNSIGNED_BYTE,
                     texture_image.as_bytes().as_ptr() as _,
                 );
-
-                // gl::Uniform1i(texture_location, index as _);
             }
         }
+
+        let texture_location = shader_program.locate_uniform(texture_shader_name)?;
+        unsafe { gl::Uniform1i(texture_location, index as _) };
 
         Ok(Texture { id })
     }
 
-    fn load_image_file<P>(texture_filename: P) -> anyhow::Result<(image::DynamicImage, GLenum)>
+    fn load_image_file<P>(
+        texture_filename: P,
+        flip: bool,
+    ) -> anyhow::Result<(image::DynamicImage, GLenum)>
     where
         P: AsRef<Path>,
     {
         let texture_image = image::open(&texture_filename)
             .with_context(|| format!("Could not open image {:?}", texture_filename.as_ref()))?;
-        // .flipv();
+
+        let texture_image = if flip {
+            texture_image.flipv()
+        } else {
+            texture_image
+        };
 
         let texture_colour_type = match texture_image.color() {
             ColorType::Rgb8 => gl::RGB,
@@ -231,9 +239,9 @@ impl Texture {
 
 impl IndexedMesh {
     pub fn new<Vertex>(
-        shader_program: &ShaderProgram,
         indices: &[u32],
         vertices: &[Vertex],
+        textures: Vec<Texture>,
     ) -> anyhow::Result<Self>
     where
         Vertex: crate::Vertex,
@@ -272,8 +280,6 @@ impl IndexedMesh {
                 .map(|attribute| attribute.count * attribute.attribute_type.num_bytes())
                 .sum();
 
-            shader_program.enable();
-
             let mut offset = 0;
             for (index, attribute) in attributes.iter().enumerate() {
                 gl::EnableVertexAttribArray(index as _);
@@ -297,12 +303,18 @@ impl IndexedMesh {
             vbo,
             ebo,
             num_indices,
+            textures,
         })
     }
 
     pub fn draw(&self) {
         unsafe {
             gl::BindVertexArray(self.vao);
+
+            for (index, texture) in self.textures.iter().enumerate() {
+                gl::BindTexture(gl::TEXTURE0 + index as u32, texture.id);
+            }
+
             gl::DrawElements(
                 gl::TRIANGLES,
                 self.num_indices as _,
@@ -314,7 +326,7 @@ impl IndexedMesh {
 }
 
 impl PointsMesh {
-    pub fn new<Vertex>(shader_program: &ShaderProgram, vertices: &[Vertex]) -> anyhow::Result<Self>
+    pub fn new<Vertex>(vertices: &[Vertex], textures: Vec<Texture>) -> anyhow::Result<Self>
     where
         Vertex: crate::Vertex,
     {
@@ -323,8 +335,6 @@ impl PointsMesh {
             .iter()
             .map(|attribute| attribute.count * attribute.attribute_type.num_bytes())
             .sum();
-
-        shader_program.enable();
 
         let mut vao = 0;
         let mut vbo = 0;
@@ -370,11 +380,16 @@ impl PointsMesh {
             vao,
             vbo,
             num_points,
+            textures,
         })
     }
 
     pub fn draw(&self) {
         unsafe {
+            for (index, texture) in self.textures.iter().enumerate() {
+                gl::BindTexture(gl::TEXTURE0 + index as u32, texture.id);
+            }
+
             gl::BindVertexArray(self.vao);
             gl::DrawArrays(gl::TRIANGLES, 0, self.num_points as _);
         }
