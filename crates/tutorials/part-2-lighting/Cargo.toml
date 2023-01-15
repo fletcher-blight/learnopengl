@@ -1,0 +1,14 @@
+[package]
+name = "tutorials-part-2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+nalgebra-glm = "0.18"
+
+opengl-sys = { path= "../../opengl-sys" }
+opengl = { path="../../opengl" }
+winman = { path="../../winman" }
+camera = { path="../../camera" }

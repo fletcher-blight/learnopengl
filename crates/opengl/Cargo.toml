@@ -1,0 +1,10 @@
+[package]
+name = "opengl"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+opengl-sys = { path="../opengl-sys" }
+image = "0.24"
+thiserror = "1.0"

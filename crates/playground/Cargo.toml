@@ -1,0 +1,15 @@
+[package]
+name = "playground"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+nalgebra-glm = "0.18"
+rand = "0.8"
+
+opengl-sys = { path= "../opengl-sys" }
+opengl = { path="../opengl" }
+winman = { path="../winman" }
+camera = { path="../camera" }

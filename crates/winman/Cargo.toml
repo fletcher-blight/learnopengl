@@ -1,0 +1,10 @@
+[package]
+name = "winman"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+gl = "0.14"
+sdl2 = { version = "0.35", features = ["bundled", "static-link"] }
