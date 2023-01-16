@@ -68,41 +68,27 @@ fn main() -> anyhow::Result<()> {
     let image_dir = asset_dir.join("images");
     let skybox_dir = asset_dir.join("skyboxes");
 
-    let cube_mesh = IndexedMesh::new(
-        &cube::INDICES,
-        &cube::VERTICES,
-        vec![
-            Texture::from_file_2d(
-                &cube_shader_program,
-                "tex1",
-                0,
-                image_dir.join("splatoon-face.jpeg"),
-            )?,
-            Texture::from_file_2d(
-                &cube_shader_program,
-                "tex2",
-                1,
-                image_dir.join("ship_C.png"),
-            )?,
-        ],
-    )?;
+    let splatoon_texture = TextureImage2D::load_from_file(&image_dir.join("splatoon-face.jpeg"))?;
+    let ship_c_texture = TextureImage2D::load_from_file(&image_dir.join("ship_C.png"))?;
+    let skybox_texture = TextureCubeMap::load_from_file(&CubeMap {
+        right: skybox_dir.join("right.jpg"),
+        left: skybox_dir.join("left.jpg"),
+        top: skybox_dir.join("top.jpg"),
+        bottom: skybox_dir.join("bottom.jpg"),
+        back: skybox_dir.join("back.jpg"),
+        front: skybox_dir.join("front.jpg"),
+    })?;
 
-    let skybox_mesh = PointsMesh::new(
-        &skybox::VERTICES,
-        vec![Texture::from_file_cubemap(
-            &skybox_shader_program,
-            "skybox",
-            0,
-            CubeMap {
-                right: skybox_dir.join("right.jpg"),
-                left: skybox_dir.join("left.jpg"),
-                top: skybox_dir.join("top.jpg"),
-                bottom: skybox_dir.join("bottom.jpg"),
-                back: skybox_dir.join("back.jpg"),
-                front: skybox_dir.join("front.jpg"),
-            },
-        )?],
-    )?;
+    let splatoon_proxy =
+        TextureActivationProxy::new(&splatoon_texture, &cube_shader_program, "tex1", 0)?;
+    let ship_c_proxy =
+        TextureActivationProxy::new(&ship_c_texture, &cube_shader_program, "tex2", 1)?;
+    let skybox_proxy =
+        TextureActivationProxy::new(&skybox_texture, &skybox_shader_program, "skybox", 0)?;
+
+    let cube_mesh =
+        Mesh::create_and_bind(&cube::VERTICES, Some(&cube::INDICES), DrawMode::Triangles)?;
+    let skybox_mesh = Mesh::create_and_bind(&skybox::VERTICES, None, DrawMode::Triangles)?;
 
     log::info!("Loading assets ... complete");
 
@@ -176,6 +162,8 @@ fn main() -> anyhow::Result<()> {
         let camera_view = camera.calculate_view();
         let camera_projection = camera.calculate_projection(window_size);
 
+        splatoon_proxy.activate().unwrap();
+        ship_c_proxy.activate().unwrap();
         cube_shader_program.enable().unwrap();
         set_uniform_mat4(cube_view_location, &camera_view).unwrap();
         set_uniform_mat4(cube_projection_location, &camera_projection).unwrap();
@@ -185,10 +173,11 @@ fn main() -> anyhow::Result<()> {
                 &calculate_model(total_passed_seconds, position, orbit, rotation),
             )
             .unwrap();
-            cube_mesh.draw();
+            cube_mesh.draw().unwrap();
         }
 
         unsafe { gl::DepthFunc(gl::LEQUAL) };
+        skybox_proxy.activate().unwrap();
         skybox_shader_program.enable().unwrap();
         set_uniform_mat4(
             skybox_view_location,
@@ -196,7 +185,7 @@ fn main() -> anyhow::Result<()> {
         )
         .unwrap();
         set_uniform_mat4(skybox_projection_location, &camera_projection).unwrap();
-        skybox_mesh.draw();
+        skybox_mesh.draw().unwrap();
         unsafe { gl::DepthFunc(gl::LESS) };
 
         last_frame_instant = current_frame_instant;

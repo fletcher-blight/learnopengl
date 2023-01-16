@@ -1,14 +1,16 @@
 extern crate anyhow;
-extern crate gl;
 extern crate image;
 extern crate thiserror;
 
 use crate::opengl;
 use crate::shader::ShaderProgram;
 use anyhow::Context;
-use gl::types::*;
-use image::ColorType;
+use image::{ColorType, DynamicImage};
 use std::path::Path;
+
+pub use opengl::BufferTarget;
+pub use opengl::DrawMode;
+pub use opengl::VertexAttributeSize as BufferAttributeSize;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -17,8 +19,215 @@ pub enum Error {
 }
 
 #[derive(Clone)]
-pub struct Texture {
-    pub(crate) id: GLuint,
+pub struct VertexArray {
+    id: opengl::VertexArrayID,
+}
+
+impl VertexArray {
+    pub fn new() -> Self {
+        Self {
+            id: opengl::create_vertex_array(),
+        }
+    }
+
+    pub fn bind(&self) -> anyhow::Result<()> {
+        opengl::bind_vertex_array(self.id)?;
+        Ok(())
+    }
+}
+
+impl Drop for VertexArray {
+    fn drop(&mut self) {
+        opengl::delete_vertex_array(self.id).expect("Failed to delete vertex array");
+    }
+}
+
+#[derive(Clone)]
+pub struct Buffer {
+    id: opengl::BufferID,
+    target: BufferTarget,
+    size: u64,
+}
+
+#[derive(Copy, Clone)]
+pub struct BufferAttribute {
+    pub size: BufferAttributeSize,
+    pub data_type: opengl::DataType,
+}
+
+pub trait BufferVertex {
+    fn attribute_layout() -> &'static [BufferAttribute];
+}
+
+impl BufferVertex for u32 {
+    fn attribute_layout() -> &'static [BufferAttribute] {
+        &[BufferAttribute {
+            size: opengl::VertexAttributeSize::Single,
+            data_type: opengl::DataType::U32,
+        }]
+    }
+}
+
+impl Buffer {
+    pub fn new(target: BufferTarget) -> Self {
+        Self {
+            id: opengl::create_buffer(),
+            target,
+            size: 0,
+        }
+    }
+
+    pub fn bind<Vertex: BufferVertex>(&mut self, vertices: &[Vertex]) -> anyhow::Result<()> {
+        opengl::bind_buffer(self.id, self.target)?;
+        opengl::set_buffer_data(self.target, opengl::BufferUsage::StaticDraw, vertices)?;
+
+        let attributes = Vertex::attribute_layout();
+        let stride = attributes
+            .iter()
+            .map(|attribute| attribute.size.as_value() * attribute.data_type.num_bytes())
+            .sum();
+
+        let mut offset = 0;
+        for (index, attribute) in attributes.iter().enumerate() {
+            opengl::enable_vertex_attribute_array(index as _)?;
+            opengl::vertex_attribute_pointer(
+                index as _,
+                attribute.size,
+                attribute.data_type,
+                false,
+                stride,
+                offset,
+            )?;
+
+            offset += attribute.size.as_value() * attribute.data_type.num_bytes();
+        }
+
+        self.size = vertices.len() as _;
+        Ok(())
+    }
+}
+
+impl Drop for Buffer {
+    fn drop(&mut self) {
+        opengl::delete_buffer(self.id).expect("Failed to delete buffer");
+    }
+}
+
+fn load_image<P>(
+    filename: &P,
+    flip_verticals: bool,
+) -> anyhow::Result<(DynamicImage, opengl::TextureFormat)>
+where
+    P: AsRef<Path>,
+{
+    let image = image::open(filename)
+        .with_context(|| format!("Could not open image {:?}", filename.as_ref()))?;
+
+    let image = if flip_verticals { image.flipv() } else { image };
+
+    let format = match image.color() {
+        ColorType::Rgb8 => Ok(opengl::TextureFormat::RGB),
+        ColorType::Rgba8 => Ok(opengl::TextureFormat::RGB),
+        _ => Err(Error::InvalidImageColourType(
+            filename.as_ref().into(),
+            image.color(),
+        )),
+    }?;
+
+    Ok((image, format))
+}
+
+pub trait TextureType {
+    fn bind(&self) -> anyhow::Result<()>;
+}
+
+pub struct TextureActivationProxy<'a, Texture: TextureType> {
+    texture: &'a Texture,
+    index: u32,
+}
+
+impl<'a, Texture: TextureType> TextureActivationProxy<'a, Texture> {
+    pub fn new(
+        texture: &'a Texture,
+        shader_program: &ShaderProgram,
+        name: &str,
+        index: u32,
+    ) -> anyhow::Result<Self> {
+        shader_program.enable()?;
+        let location = shader_program.locate_uniform(name)?;
+        opengl::set_uniform_i32(location, index as _)?;
+        Ok(Self { texture, index })
+    }
+
+    pub fn activate(&self) -> anyhow::Result<()> {
+        opengl::active_texture(self.index)?;
+        self.texture.bind()?;
+        Ok(())
+    }
+}
+
+pub struct TextureImage2D {
+    id: opengl::TextureID,
+}
+
+impl TextureImage2D {
+    pub fn load_from_file<P>(texture_filename: &P) -> anyhow::Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let (image, format) = load_image(texture_filename, true)?;
+        let texture = Self {
+            id: opengl::create_texture(),
+        };
+
+        opengl::bind_texture(texture.id, opengl::TextureTarget::Image2D)?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::Image2D,
+            opengl::TextureParameterName::WrapS,
+            opengl::TextureParameterValue::Repeat,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::Image2D,
+            opengl::TextureParameterName::WrapT,
+            opengl::TextureParameterValue::Repeat,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::Image2D,
+            opengl::TextureParameterName::MinFilter,
+            opengl::TextureParameterValue::Linear,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::Image2D,
+            opengl::TextureParameterName::MagFilter,
+            opengl::TextureParameterValue::Linear,
+        )?;
+        opengl::load_texture_image2d(
+            opengl::TextureTarget::Image2D,
+            0,
+            opengl::TextureFormat::RGBA,
+            image.width() as _,
+            image.height() as _,
+            format,
+            opengl::DataType::U8,
+            image.as_bytes(),
+        )?;
+        opengl::generate_mipmaps(opengl::TextureTarget::Image2D)?;
+
+        Ok(texture)
+    }
+}
+
+impl TextureType for TextureImage2D {
+    fn bind(&self) -> anyhow::Result<()> {
+        opengl::bind_texture(self.id, opengl::TextureTarget::Image2D)?;
+        Ok(())
+    }
+}
+
+impl Drop for TextureImage2D {
+    fn drop(&mut self) {
+        opengl::delete_texture(self.id).expect("Failed to delete texture 2D image");
+    }
 }
 
 pub struct CubeMap<Data> {
@@ -30,390 +239,153 @@ pub struct CubeMap<Data> {
     pub front: Data,
 }
 
-pub struct IndexedMesh {
-    vao: GLuint,
-    vbo: GLuint,
-    ebo: GLuint,
-    num_indices: usize,
-    textures: Vec<Texture>,
-}
-
-pub struct PointsMesh {
-    vao: GLuint,
-    vbo: GLuint,
-    num_points: usize,
-    textures: Vec<Texture>,
-}
-
-pub trait Vertex {
-    fn attributes() -> &'static [Attribute];
-}
-
-#[derive(Copy, Clone)]
-pub enum AttributeType {
-    F32,
-    U32,
-}
-
-pub struct Attribute {
-    pub attribute_type: AttributeType,
-    pub count: usize,
-}
-
-impl Drop for Texture {
-    fn drop(&mut self) {
-        unsafe {
-            gl::DeleteTextures(1, &self.id);
+impl<D> CubeMap<D> {
+    fn get_face(&self, face_target: opengl::TextureCubeMapFaceTarget) -> &D {
+        match face_target {
+            opengl::TextureCubeMapFaceTarget::Right => &self.right,
+            opengl::TextureCubeMapFaceTarget::Left => &self.left,
+            opengl::TextureCubeMapFaceTarget::Top => &self.top,
+            opengl::TextureCubeMapFaceTarget::Bottom => &self.bottom,
+            opengl::TextureCubeMapFaceTarget::Back => &self.back,
+            opengl::TextureCubeMapFaceTarget::Front => &self.front,
         }
     }
 }
 
-impl Drop for IndexedMesh {
-    fn drop(&mut self) {
-        unsafe {
-            gl::DeleteBuffers(1, &self.ebo);
-            gl::DeleteBuffers(1, &self.vbo);
-            gl::DeleteVertexArrays(1, &self.vao);
-        }
-    }
+pub struct TextureCubeMap {
+    id: opengl::TextureID,
 }
 
-impl Drop for PointsMesh {
-    fn drop(&mut self) {
-        unsafe {
-            gl::DeleteBuffers(1, &self.vbo);
-            gl::DeleteVertexArrays(1, &self.vao);
-        }
-    }
-}
-
-impl Texture {
-    pub fn from_file_2d<P>(
-        shader_program: &ShaderProgram,
-        texture_shader_name: &str,
-        index: u32,
-        texture_filename: P,
-    ) -> anyhow::Result<Self>
+impl TextureCubeMap {
+    pub fn load_from_file<P>(texture_filenames: &CubeMap<P>) -> anyhow::Result<Self>
     where
         P: AsRef<Path>,
     {
-        let (texture_image, texture_colour_type) =
-            Texture::load_image_file(texture_filename, true)?;
+        let texture = Self {
+            id: opengl::create_texture(),
+        };
 
-        let mut id = 0;
-        unsafe {
-            gl::GenTextures(1, &mut id);
-            gl::BindTexture(gl::TEXTURE_2D, id);
+        opengl::bind_texture(texture.id, opengl::TextureTarget::CubeMap)?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::CubeMap,
+            opengl::TextureParameterName::WrapS,
+            opengl::TextureParameterValue::ClampToEdge,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::CubeMap,
+            opengl::TextureParameterName::WrapT,
+            opengl::TextureParameterValue::ClampToEdge,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::CubeMap,
+            opengl::TextureParameterName::WrapR,
+            opengl::TextureParameterValue::ClampToEdge,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::CubeMap,
+            opengl::TextureParameterName::MinFilter,
+            opengl::TextureParameterValue::Linear,
+        )?;
+        opengl::set_texture_parameter_value(
+            opengl::TextureTarget::CubeMap,
+            opengl::TextureParameterName::MagFilter,
+            opengl::TextureParameterValue::Linear,
+        )?;
 
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as _);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as _);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as _);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as _);
+        for target_face in [
+            opengl::TextureCubeMapFaceTarget::Right,
+            opengl::TextureCubeMapFaceTarget::Left,
+            opengl::TextureCubeMapFaceTarget::Top,
+            opengl::TextureCubeMapFaceTarget::Bottom,
+            opengl::TextureCubeMapFaceTarget::Back,
+            opengl::TextureCubeMapFaceTarget::Front,
+        ] {
+            let texture_filename = texture_filenames.get_face(target_face);
+            let (image, format) = load_image(texture_filename, false)?;
 
-            gl::TexImage2D(
-                gl::TEXTURE_2D,
+            opengl::load_texture_image2d(
+                opengl::TextureTarget::CubeMapFace(target_face),
                 0,
-                gl::RGBA as _,
-                texture_image.width() as _,
-                texture_image.height() as _,
-                0,
-                texture_colour_type,
-                gl::UNSIGNED_BYTE,
-                texture_image.as_bytes().as_ptr() as _,
-            );
-            gl::GenerateMipmap(gl::TEXTURE_2D);
-        };
-
-        let texture_location = shader_program.locate_uniform(texture_shader_name)?;
-        shader_program.enable()?;
-        opengl::set_uniform_i32(texture_location, index as _)?;
-
-        Ok(Texture { id })
-    }
-
-    pub fn from_file_cubemap<P>(
-        shader_program: &ShaderProgram,
-        texture_shader_name: &str,
-        index: u32,
-        texture_filenames: CubeMap<P>,
-    ) -> anyhow::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let filenames = [
-            texture_filenames.right,
-            texture_filenames.left,
-            texture_filenames.top,
-            texture_filenames.bottom,
-            texture_filenames.front,
-            texture_filenames.back,
-        ];
-
-        let texture_images: Vec<_> = filenames
-            .iter()
-            .map(|path| Texture::load_image_file(path, false))
-            .collect::<anyhow::Result<_>>()?;
-
-        let mut id = 0;
-        unsafe {
-            gl::GenTextures(1, &mut id);
-            gl::BindTexture(gl::TEXTURE_CUBE_MAP, id);
-
-            gl::TexParameteri(
-                gl::TEXTURE_CUBE_MAP,
-                gl::TEXTURE_WRAP_S,
-                gl::CLAMP_TO_EDGE as _,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_CUBE_MAP,
-                gl::TEXTURE_WRAP_T,
-                gl::CLAMP_TO_EDGE as _,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_CUBE_MAP,
-                gl::TEXTURE_WRAP_R,
-                gl::CLAMP_TO_EDGE as _,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_CUBE_MAP,
-                gl::TEXTURE_MIN_FILTER,
-                gl::LINEAR as _,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_CUBE_MAP,
-                gl::TEXTURE_MAG_FILTER,
-                gl::LINEAR as _,
-            );
+                opengl::TextureFormat::RGB,
+                image.width() as _,
+                image.height() as _,
+                format,
+                opengl::DataType::U8,
+                image.as_bytes(),
+            )?;
         }
 
-        for (index, (texture_image, texture_colour_type)) in texture_images.into_iter().enumerate()
-        {
-            unsafe {
-                gl::TexImage2D(
-                    gl::TEXTURE_CUBE_MAP_POSITIVE_X + index as u32,
-                    0,
-                    gl::RGB as _,
-                    texture_image.width() as _,
-                    texture_image.height() as _,
-                    0,
-                    texture_colour_type,
-                    gl::UNSIGNED_BYTE,
-                    texture_image.as_bytes().as_ptr() as _,
-                );
-            }
-        }
-
-        let texture_location = shader_program.locate_uniform(texture_shader_name)?;
-        shader_program.enable()?;
-        opengl::set_uniform_i32(texture_location, index as _)?;
-
-        Ok(Texture { id })
-    }
-
-    fn load_image_file<P>(
-        texture_filename: P,
-        flip: bool,
-    ) -> anyhow::Result<(image::DynamicImage, GLenum)>
-    where
-        P: AsRef<Path>,
-    {
-        let texture_image = image::open(&texture_filename)
-            .with_context(|| format!("Could not open image {:?}", texture_filename.as_ref()))?;
-
-        let texture_image = if flip {
-            texture_image.flipv()
-        } else {
-            texture_image
-        };
-
-        let texture_colour_type = match texture_image.color() {
-            ColorType::Rgb8 => gl::RGB,
-            ColorType::Rgba8 => gl::RGBA,
-            _ => anyhow::bail!(Error::InvalidImageColourType(
-                texture_filename.as_ref().into(),
-                texture_image.color()
-            )),
-        };
-
-        Ok((texture_image, texture_colour_type))
+        Ok(texture)
     }
 }
 
-impl IndexedMesh {
-    pub fn new<Vertex>(
-        indices: &[u32],
-        vertices: &[Vertex],
-        textures: Vec<Texture>,
-    ) -> anyhow::Result<Self>
-    where
-        Vertex: crate::Vertex,
-    {
-        let mut vao = 0;
-        let mut vbo = 0;
-        let mut ebo = 0;
-        let num_indices = indices.len();
+impl TextureType for TextureCubeMap {
+    fn bind(&self) -> anyhow::Result<()> {
+        opengl::bind_texture(self.id, opengl::TextureTarget::CubeMap)?;
+        Ok(())
+    }
+}
 
-        unsafe {
-            gl::GenVertexArrays(1, &mut vao);
-            gl::GenBuffers(1, &mut vbo);
-            gl::GenBuffers(1, &mut ebo);
+impl Drop for TextureCubeMap {
+    fn drop(&mut self) {
+        opengl::delete_texture(self.id).expect("Failed to delete texture cubemap");
+    }
+}
 
-            gl::BindVertexArray(vao);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
+#[derive(Clone)]
+pub struct Mesh {
+    vao: VertexArray,
+    vbo: Buffer,
+    ebo: Option<Buffer>,
+    draw_mode: DrawMode,
+}
 
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                (vertices.len() * std::mem::size_of::<Vertex>()) as _,
-                vertices.as_ptr() as _,
-                gl::STATIC_DRAW,
-            );
-            gl::BufferData(
-                gl::ELEMENT_ARRAY_BUFFER,
-                (indices.len() * std::mem::size_of::<u32>()) as _,
-                indices.as_ptr() as _,
-                gl::STATIC_DRAW,
-            );
-
-            let attributes = Vertex::attributes();
-
-            let stride: usize = attributes
-                .iter()
-                .map(|attribute| attribute.count * attribute.attribute_type.num_bytes())
-                .sum();
-
-            let mut offset = 0;
-            for (index, attribute) in attributes.iter().enumerate() {
-                gl::EnableVertexAttribArray(index as _);
-                gl::VertexAttribPointer(
-                    index as _,
-                    attribute.count as _,
-                    attribute.attribute_type.into(),
-                    gl::FALSE,
-                    stride as _,
-                    offset as _,
-                );
-
-                offset += attribute.count * attribute.attribute_type.num_bytes();
-            }
-
-            gl::BindVertexArray(0);
-        };
-
-        Ok(IndexedMesh {
+impl Mesh {
+    pub fn new(vao: VertexArray, vbo: Buffer, ebo: Option<Buffer>, draw_mode: DrawMode) -> Self {
+        Self {
             vao,
             vbo,
             ebo,
-            num_indices,
-            textures,
-        })
-    }
-
-    pub fn draw(&self) {
-        unsafe {
-            gl::BindVertexArray(self.vao);
-
-            for (index, texture) in self.textures.iter().enumerate() {
-                gl::ActiveTexture(gl::TEXTURE0 + index as u32);
-                gl::BindTexture(gl::TEXTURE_2D, texture.id);
-            }
-
-            gl::DrawElements(
-                gl::TRIANGLES,
-                self.num_indices as _,
-                gl::UNSIGNED_INT,
-                std::ptr::null(),
-            );
+            draw_mode,
         }
     }
-}
 
-impl PointsMesh {
-    pub fn new<Vertex>(vertices: &[Vertex], textures: Vec<Texture>) -> anyhow::Result<Self>
-    where
-        Vertex: crate::Vertex,
-    {
-        let attributes = Vertex::attributes();
-        let stride: usize = attributes
-            .iter()
-            .map(|attribute| attribute.count * attribute.attribute_type.num_bytes())
-            .sum();
+    pub fn create_and_bind<Vertex: BufferVertex>(
+        buffer_data: &[Vertex],
+        indices: Option<&[u32]>,
+        draw_mode: DrawMode,
+    ) -> anyhow::Result<Self> {
+        let vao = VertexArray::new();
+        let mut vbo = Buffer::new(BufferTarget::Array);
 
-        let mut vao = 0;
-        let mut vbo = 0;
-        unsafe {
-            gl::GenVertexArrays(1, &mut vao);
-            gl::GenBuffers(1, &mut vbo);
-
-            gl::BindVertexArray(vao);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                (vertices.len() * std::mem::size_of::<Vertex>()) as _,
-                vertices.as_ptr() as _,
-                gl::STATIC_DRAW,
-            );
-
-            let mut offset = 0;
-            for (index, attribute) in attributes.iter().enumerate() {
-                gl::EnableVertexAttribArray(index as _);
-                gl::VertexAttribPointer(
-                    index as _,
-                    attribute.count as _,
-                    attribute.attribute_type.into(),
-                    gl::FALSE,
-                    stride as _,
-                    offset as _,
-                );
-
-                offset += attribute.count * attribute.attribute_type.num_bytes();
-            }
-
-            gl::BindVertexArray(0);
+        vao.bind()?;
+        vbo.bind(buffer_data)?;
+        let ebo = if let Some(indices) = indices {
+            let mut buffer = Buffer::new(BufferTarget::ElementArray);
+            buffer.bind(indices)?;
+            Some(buffer)
+        } else {
+            None
         };
 
-        let num_points = vertices.len()
-            * attributes
-                .iter()
-                .map(|attribute| attribute.count)
-                .sum::<usize>();
-
-        Ok(PointsMesh {
+        opengl::bind_vertex_array(0)?;
+        Ok(Self {
             vao,
             vbo,
-            num_points,
-            textures,
+            ebo,
+            draw_mode,
         })
     }
 
-    pub fn draw(&self) {
-        unsafe {
-            for (index, texture) in self.textures.iter().enumerate() {
-                gl::ActiveTexture(gl::TEXTURE0 + index as u32);
-                gl::BindTexture(gl::TEXTURE_CUBE_MAP, texture.id);
-            }
+    pub fn draw(&self) -> anyhow::Result<()> {
+        self.vao.bind()?;
 
-            gl::BindVertexArray(self.vao);
-            gl::DrawArrays(gl::TRIANGLES, 0, self.num_points as _);
+        if let Some(ebo) = &self.ebo {
+            opengl::draw_elements(self.draw_mode, ebo.size, opengl::DataType::U32)?;
+        } else {
+            opengl::draw_arrays(self.draw_mode, 0, self.vbo.size)?;
         }
-    }
-}
 
-impl AttributeType {
-    fn num_bytes(&self) -> usize {
-        match self {
-            AttributeType::F32 => std::mem::size_of::<f32>(),
-            AttributeType::U32 => std::mem::size_of::<u32>(),
-        }
-    }
-}
-
-impl From<AttributeType> for GLenum {
-    fn from(value: AttributeType) -> Self {
-        match value {
-            AttributeType::F32 => gl::FLOAT,
-            AttributeType::U32 => gl::UNSIGNED_INT,
-        }
+        Ok(())
     }
 }

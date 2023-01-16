@@ -47,6 +47,7 @@ pub fn assert_no_error() -> Result<(), Error> {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum DataType {
     I8,
     U8,
@@ -55,6 +56,17 @@ pub enum DataType {
     I32,
     U32,
     F32,
+}
+
+impl DataType {
+    pub fn num_bytes(&self) -> u32 {
+        match self {
+            DataType::I8 | DataType::U8 => 1,
+            DataType::I16 | DataType::U16 => 2,
+            DataType::I32 | DataType::U32 => 4,
+            DataType::F32 => 4,
+        }
+    }
 }
 
 impl From<DataType> for GLenum {
@@ -71,6 +83,37 @@ impl From<DataType> for GLenum {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum DrawMode {
+    Triangles,
+}
+
+pub fn draw_arrays(mode: DrawMode, starting_index: u64, count: u64) -> Result<(), Error> {
+    unsafe { gl::DrawArrays(mode.into(), starting_index as _, count as _) };
+    assert_no_error()
+}
+
+pub fn draw_elements(mode: DrawMode, num_indices: u64, index_type: DataType) -> Result<(), Error> {
+    unsafe {
+        gl::DrawElements(
+            mode.into(),
+            num_indices as _,
+            index_type.into(),
+            std::ptr::null(),
+        )
+    };
+    assert_no_error()
+}
+
+impl From<DrawMode> for GLenum {
+    fn from(value: DrawMode) -> Self {
+        match value {
+            DrawMode::Triangles => gl::TRIANGLES,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 pub enum ShaderType {
     Vertex,
     Geometry,
@@ -107,6 +150,7 @@ pub fn compile_shader(id: ShaderID) -> Result<(), Error> {
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum ShaderParameter {
     ShaderType,
     DeleteStatus,
@@ -211,6 +255,7 @@ pub fn link_program(program_id: ProgramID) -> Result<(), Error> {
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum ProgramParameter {
     LinkStatus,
     InfoLogLength,
@@ -301,6 +346,7 @@ pub fn delete_buffer(buffer_id: BufferID) -> Result<(), Error> {
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum BufferTarget {
     Array,
     ElementArray,
@@ -311,8 +357,9 @@ pub fn bind_buffer(buffer_id: BufferID, buffer_target: BufferTarget) -> Result<(
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum BufferUsage {
-    Static,
+    StaticDraw,
 }
 
 pub fn set_buffer_data<Data>(
@@ -343,7 +390,7 @@ impl From<BufferTarget> for GLenum {
 impl From<BufferUsage> for GLenum {
     fn from(value: BufferUsage) -> Self {
         match value {
-            BufferUsage::Static => gl::STATIC_DRAW,
+            BufferUsage::StaticDraw => gl::STATIC_DRAW,
         }
     }
 }
@@ -371,6 +418,7 @@ pub fn enable_vertex_attribute_array(index: u32) -> Result<(), Error> {
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum VertexAttributeSize {
     Single,
     Double,
@@ -400,6 +448,12 @@ pub fn vertex_attribute_pointer(
     assert_no_error()
 }
 
+impl VertexAttributeSize {
+    pub fn as_value(&self) -> u32 {
+        *self as i32 as u32
+    }
+}
+
 impl From<VertexAttributeSize> for GLint {
     fn from(value: VertexAttributeSize) -> Self {
         match value {
@@ -425,9 +479,21 @@ pub fn delete_texture(texture_id: TextureID) -> Result<(), Error> {
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum TextureCubeMapFaceTarget {
+    Right,
+    Left,
+    Top,
+    Bottom,
+    Back,
+    Front,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub enum TextureTarget {
     Image2D,
     CubeMap,
+    CubeMapFace(TextureCubeMapFaceTarget),
 }
 
 pub fn bind_texture(texture_id: TextureID, texture_target: TextureTarget) -> Result<(), Error> {
@@ -440,6 +506,7 @@ pub fn active_texture(texture_index: u32) -> Result<(), Error> {
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum TextureParameterName {
     WrapS,
     WrapT,
@@ -448,9 +515,11 @@ pub enum TextureParameterName {
     MagFilter,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum TextureParameterValue {
     Linear,
     ClampToEdge,
+    Repeat,
 }
 
 pub fn set_texture_parameter_value(
@@ -468,6 +537,7 @@ pub fn set_texture_parameter_value(
     assert_no_error()
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum TextureFormat {
     RGB,
     RGBA,
@@ -484,11 +554,12 @@ pub fn load_texture_image2d<Data>(
     data_type: DataType,
     data: &[Data],
 ) -> Result<(), Error> {
+    let internal_format: GLenum = internal_format.into();
     unsafe {
         gl::TexImage2D(
             texture_target.into(),
             mipmap_level as _,
-            (internal_format as GLenum) as _,
+            internal_format as _,
             width as _,
             height as _,
             0,
@@ -500,11 +571,30 @@ pub fn load_texture_image2d<Data>(
     assert_no_error()
 }
 
+pub fn generate_mipmaps(texture_target: TextureTarget) -> Result<(), Error> {
+    unsafe { gl::GenerateMipmap(texture_target.into()) };
+    assert_no_error()
+}
+
 impl From<TextureTarget> for GLuint {
     fn from(value: TextureTarget) -> Self {
         match value {
             TextureTarget::Image2D => gl::TEXTURE_2D,
             TextureTarget::CubeMap => gl::TEXTURE_CUBE_MAP,
+            TextureTarget::CubeMapFace(face_target) => face_target.into(),
+        }
+    }
+}
+
+impl From<TextureCubeMapFaceTarget> for GLenum {
+    fn from(value: TextureCubeMapFaceTarget) -> Self {
+        match value {
+            TextureCubeMapFaceTarget::Right => gl::TEXTURE_CUBE_MAP_POSITIVE_X,
+            TextureCubeMapFaceTarget::Left => gl::TEXTURE_CUBE_MAP_NEGATIVE_X,
+            TextureCubeMapFaceTarget::Top => gl::TEXTURE_CUBE_MAP_POSITIVE_Y,
+            TextureCubeMapFaceTarget::Bottom => gl::TEXTURE_CUBE_MAP_NEGATIVE_Y,
+            TextureCubeMapFaceTarget::Front => gl::TEXTURE_CUBE_MAP_POSITIVE_Z,
+            TextureCubeMapFaceTarget::Back => gl::TEXTURE_CUBE_MAP_NEGATIVE_Z,
         }
     }
 }
@@ -526,6 +616,7 @@ impl From<TextureParameterValue> for GLint {
         (match value {
             TextureParameterValue::Linear => gl::LINEAR,
             TextureParameterValue::ClampToEdge => gl::CLAMP_TO_EDGE,
+            TextureParameterValue::Repeat => gl::REPEAT,
         }) as _
     }
 }

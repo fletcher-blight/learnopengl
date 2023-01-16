@@ -1,4 +1,5 @@
-use crate::assets::{Attribute, AttributeType};
+use crate::assets::{BufferAttribute, BufferAttributeSize};
+use crate::opengl;
 
 #[repr(C, packed)]
 pub struct Vertex {
@@ -6,19 +7,19 @@ pub struct Vertex {
     tex_coords: [f32; 2],
 }
 
-const ATTRIBUTES: [Attribute; 2] = [
-    Attribute {
-        attribute_type: AttributeType::F32,
-        count: 3,
+const ATTRIBUTES: [BufferAttribute; 2] = [
+    BufferAttribute {
+        data_type: opengl::DataType::F32,
+        size: BufferAttributeSize::Triple,
     },
-    Attribute {
-        attribute_type: AttributeType::F32,
-        count: 2,
+    BufferAttribute {
+        data_type: opengl::DataType::F32,
+        size: BufferAttributeSize::Double,
     },
 ];
 
-impl crate::Vertex for Vertex {
-    fn attributes() -> &'static [Attribute] {
+impl crate::BufferVertex for Vertex {
+    fn attribute_layout() -> &'static [BufferAttribute] {
         &ATTRIBUTES
     }
 }
