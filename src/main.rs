@@ -176,16 +176,6 @@ fn main() -> anyhow::Result<()> {
         let camera_view = camera.calculate_view();
         let camera_projection = camera.calculate_projection(window_size);
 
-        unsafe { gl::DepthMask(gl::FALSE) };
-        skybox_shader_program.enable();
-        set_uniform_mat4(
-            skybox_view_location,
-            &glm::mat3_to_mat4(&glm::mat4_to_mat3(&camera_view)),
-        );
-        set_uniform_mat4(skybox_projection_location, &camera_projection);
-        skybox_mesh.draw();
-        unsafe { gl::DepthMask(gl::TRUE) };
-
         cube_shader_program.enable();
         set_uniform_mat4(cube_view_location, &camera_view);
         set_uniform_mat4(cube_projection_location, &camera_projection);
@@ -196,6 +186,16 @@ fn main() -> anyhow::Result<()> {
             );
             cube_mesh.draw();
         }
+
+        unsafe { gl::DepthFunc(gl::LEQUAL) };
+        skybox_shader_program.enable();
+        set_uniform_mat4(
+            skybox_view_location,
+            &glm::mat3_to_mat4(&glm::mat4_to_mat3(&camera_view)),
+        );
+        set_uniform_mat4(skybox_projection_location, &camera_projection);
+        skybox_mesh.draw();
+        unsafe { gl::DepthFunc(gl::LESS) };
 
         last_frame_instant = current_frame_instant;
     })
