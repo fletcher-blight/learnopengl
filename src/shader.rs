@@ -1,9 +1,7 @@
 extern crate anyhow;
-extern crate gl;
 extern crate thiserror;
 
-use gl::types::*;
-use std::ffi::CString;
+use crate::opengl;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -11,146 +9,89 @@ pub enum Error {
     Compile(String),
     #[error("Failed to link shaders: {0}")]
     Link(String),
+    #[error("Could not find uniform with name: {0}")]
+    MissingUniform(String),
 }
 
-pub enum ShaderType {
-    Vertex,
-    Geometry,
-    Fragment,
-}
+pub use opengl::ShaderType;
 
 pub struct Shader {
-    id: GLuint,
+    id: opengl::ShaderID,
 }
 
 pub struct ShaderProgram {
-    id: GLuint,
+    id: opengl::ProgramID,
 }
 
 impl Drop for Shader {
     fn drop(&mut self) {
-        unsafe {
-            gl::DeleteShader(self.id);
-        }
+        opengl::delete_shader(self.id).expect("Failed to Delete Shader");
     }
 }
 
 impl Drop for ShaderProgram {
     fn drop(&mut self) {
-        unsafe {
-            gl::DeleteProgram(self.id);
-        }
+        opengl::delete_program(self.id).expect("Failed to Delete Shader Program");
     }
 }
 
 impl Shader {
     pub fn new(source: &str, shader_type: ShaderType) -> anyhow::Result<Self> {
-        let id = unsafe {
-            let id = gl::CreateShader(shader_type.into());
-            let source_str = CString::new(source)?;
-            gl::ShaderSource(
-                id,
-                1,
-                &source_str.as_c_str().as_ptr() as _,
-                std::ptr::null(),
-            );
-            gl::CompileShader(id);
-            id
+        let shader = Shader {
+            id: opengl::create_shader(shader_type),
         };
-
-        let mut success: GLint = 0;
-        unsafe {
-            gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
+        opengl::set_shader_source(shader.id, source)?;
+        opengl::compile_shader(shader.id)?;
+        if opengl::get_shader_parameter(shader.id, opengl::ShaderParameter::CompileStatus)? != 0 {
+            Ok(shader)
+        } else {
+            let buffer_size =
+                opengl::get_shader_parameter(shader.id, opengl::ShaderParameter::InfoLogLength)?;
+            Err(anyhow::Error::new(Error::Compile(
+                opengl::get_shader_info_log(shader.id, buffer_size)?,
+            )))
         }
-        if success != gl::FALSE as i32 {
-            return Ok(Shader { id });
-        }
-
-        let mut length: GLint = 0;
-        unsafe {
-            gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut length);
-        }
-
-        let error = CString::new(" ".repeat(length as usize))?;
-        unsafe {
-            gl::GetShaderInfoLog(
-                id,
-                length,
-                std::ptr::null_mut(),
-                error.as_ptr() as *mut GLchar,
-            );
-        }
-
-        Err(anyhow::Error::new(Error::Compile(
-            error.to_string_lossy().into_owned(),
-        )))
     }
 }
 
 impl ShaderProgram {
     pub fn new(shaders: &[Shader]) -> anyhow::Result<Self> {
-        let id = unsafe {
-            let id = gl::CreateProgram();
-
-            for shader in shaders {
-                gl::AttachShader(id, shader.id);
-            }
-
-            gl::LinkProgram(id);
-
-            for shader in shaders {
-                gl::DetachShader(id, shader.id);
-            }
-
-            id
+        let shader_program = ShaderProgram {
+            id: opengl::create_program(),
         };
 
-        let mut success: GLint = 0;
-        unsafe {
-            gl::GetProgramiv(id, gl::LINK_STATUS, &mut success);
-        }
-        if success != gl::FALSE as i32 {
-            return Ok(ShaderProgram { id });
+        for shader in shaders {
+            opengl::attach_shader(shader_program.id, shader.id)?;
         }
 
-        let mut length: GLint = 0;
-        unsafe {
-            gl::GetProgramiv(id, gl::INFO_LOG_LENGTH, &mut length);
+        opengl::link_program(shader_program.id)?;
+
+        for shader in shaders {
+            opengl::detach_shader(shader_program.id, shader.id)?;
         }
 
-        let error = CString::new(" ".repeat(length as usize))?;
-        unsafe {
-            gl::GetProgramInfoLog(
-                id,
-                length,
-                std::ptr::null_mut(),
-                error.as_ptr() as *mut GLchar,
-            );
+        if opengl::get_program_paramter(shader_program.id, opengl::ProgramParameter::LinkStatus)?
+            != 0
+        {
+            Ok(shader_program)
+        } else {
+            let buffer_size = opengl::get_program_paramter(
+                shader_program.id,
+                opengl::ProgramParameter::InfoLogLength,
+            )?;
+            Err(anyhow::Error::new(Error::Link(
+                opengl::get_program_info_log(shader_program.id, buffer_size)?,
+            )))
         }
-
-        Err(anyhow::Error::new(Error::Link(
-            error.to_string_lossy().into_owned(),
-        )))
     }
 
-    pub fn enable(&self) {
-        unsafe { gl::UseProgram(self.id) }
+    pub fn enable(&self) -> anyhow::Result<()> {
+        opengl::use_program(self.id)?;
+        Ok(())
     }
 
-    pub fn locate_uniform(&self, name: &str) -> anyhow::Result<GLint> {
-        self.enable();
-        let name_cstr = CString::new(name)?;
-        let id = unsafe { gl::GetUniformLocation(self.id, name_cstr.as_c_str().as_ptr() as _) };
-        Ok(id)
-    }
-}
-
-impl From<ShaderType> for GLenum {
-    fn from(value: ShaderType) -> Self {
-        match value {
-            ShaderType::Vertex => gl::VERTEX_SHADER,
-            ShaderType::Geometry => gl::GEOMETRY_SHADER,
-            ShaderType::Fragment => gl::FRAGMENT_SHADER,
-        }
+    pub fn locate_uniform(&self, name: &str) -> anyhow::Result<opengl::UniformLocation> {
+        let location = opengl::get_uniform_location(self.id, name)?;
+        Ok(location.ok_or(Error::MissingUniform(name.into()))?)
     }
 }

@@ -1,6 +1,7 @@
 mod assets;
 mod camera;
 mod cube;
+mod opengl;
 mod shader;
 mod skybox;
 mod window;
@@ -13,7 +14,6 @@ extern crate rand;
 
 use assets::*;
 use camera::Camera;
-use gl::types::GLint;
 use nalgebra_glm as glm;
 use rand::prelude::ThreadRng;
 use rand::Rng;
@@ -78,12 +78,12 @@ fn main() -> anyhow::Result<()> {
                 0,
                 image_dir.join("splatoon-face.jpeg"),
             )?,
-            // Texture::from_file_2d(
-            //     &cube_shader_program,
-            //     "tex2",
-            //     1,
-            //     image_dir.join("ship_C.png"),
-            // )?,
+            Texture::from_file_2d(
+                &cube_shader_program,
+                "tex2",
+                1,
+                image_dir.join("ship_C.png"),
+            )?,
         ],
     )?;
 
@@ -176,24 +176,26 @@ fn main() -> anyhow::Result<()> {
         let camera_view = camera.calculate_view();
         let camera_projection = camera.calculate_projection(window_size);
 
-        cube_shader_program.enable();
-        set_uniform_mat4(cube_view_location, &camera_view);
-        set_uniform_mat4(cube_projection_location, &camera_projection);
+        cube_shader_program.enable().unwrap();
+        set_uniform_mat4(cube_view_location, &camera_view).unwrap();
+        set_uniform_mat4(cube_projection_location, &camera_projection).unwrap();
         for (position, orbit, rotation) in &cubes {
             set_uniform_mat4(
                 cube_model_location,
                 &calculate_model(total_passed_seconds, position, orbit, rotation),
-            );
+            )
+            .unwrap();
             cube_mesh.draw();
         }
 
         unsafe { gl::DepthFunc(gl::LEQUAL) };
-        skybox_shader_program.enable();
+        skybox_shader_program.enable().unwrap();
         set_uniform_mat4(
             skybox_view_location,
             &glm::mat3_to_mat4(&glm::mat4_to_mat3(&camera_view)),
-        );
-        set_uniform_mat4(skybox_projection_location, &camera_projection);
+        )
+        .unwrap();
+        set_uniform_mat4(skybox_projection_location, &camera_projection).unwrap();
         skybox_mesh.draw();
         unsafe { gl::DepthFunc(gl::LESS) };
 
@@ -201,8 +203,9 @@ fn main() -> anyhow::Result<()> {
     })
 }
 
-fn set_uniform_mat4(uniform_location: GLint, mat: &glm::Mat4) {
-    unsafe { gl::UniformMatrix4fv(uniform_location, 1, gl::FALSE, glm::value_ptr(mat).as_ptr()) }
+fn set_uniform_mat4(location: opengl::UniformLocation, mat: &glm::Mat4) -> anyhow::Result<()> {
+    opengl::set_uniform_mat4(location, false, glm::value_ptr(mat))?;
+    Ok(())
 }
 
 fn calculate_model(

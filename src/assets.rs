@@ -3,6 +3,7 @@ extern crate gl;
 extern crate image;
 extern crate thiserror;
 
+use crate::opengl;
 use crate::shader::ShaderProgram;
 use anyhow::Context;
 use gl::types::*;
@@ -102,7 +103,6 @@ impl Texture {
         let mut id = 0;
         unsafe {
             gl::GenTextures(1, &mut id);
-            gl::ActiveTexture(gl::TEXTURE0 + index);
             gl::BindTexture(gl::TEXTURE_2D, id);
 
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as _);
@@ -125,7 +125,8 @@ impl Texture {
         };
 
         let texture_location = shader_program.locate_uniform(texture_shader_name)?;
-        unsafe { gl::Uniform1i(texture_location, index as _) };
+        shader_program.enable()?;
+        opengl::set_uniform_i32(texture_location, index as _)?;
 
         Ok(Texture { id })
     }
@@ -203,7 +204,8 @@ impl Texture {
         }
 
         let texture_location = shader_program.locate_uniform(texture_shader_name)?;
-        unsafe { gl::Uniform1i(texture_location, index as _) };
+        shader_program.enable()?;
+        opengl::set_uniform_i32(texture_location, index as _)?;
 
         Ok(Texture { id })
     }
@@ -312,7 +314,8 @@ impl IndexedMesh {
             gl::BindVertexArray(self.vao);
 
             for (index, texture) in self.textures.iter().enumerate() {
-                gl::BindTexture(gl::TEXTURE0 + index as u32, texture.id);
+                gl::ActiveTexture(gl::TEXTURE0 + index as u32);
+                gl::BindTexture(gl::TEXTURE_2D, texture.id);
             }
 
             gl::DrawElements(
@@ -387,7 +390,8 @@ impl PointsMesh {
     pub fn draw(&self) {
         unsafe {
             for (index, texture) in self.textures.iter().enumerate() {
-                gl::BindTexture(gl::TEXTURE0 + index as u32, texture.id);
+                gl::ActiveTexture(gl::TEXTURE0 + index as u32);
+                gl::BindTexture(gl::TEXTURE_CUBE_MAP, texture.id);
             }
 
             gl::BindVertexArray(self.vao);
