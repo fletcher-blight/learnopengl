@@ -116,7 +116,7 @@ where
 
     let format = match image.color() {
         ColorType::Rgb8 => Ok(opengl::TextureFormat::RGB),
-        ColorType::Rgba8 => Ok(opengl::TextureFormat::RGB),
+        ColorType::Rgba8 => Ok(opengl::TextureFormat::RGBA),
         _ => Err(Error::InvalidImageColourType(
             filename.as_ref().into(),
             image.color(),
@@ -130,12 +130,12 @@ pub trait TextureType {
     fn bind(&self) -> anyhow::Result<()>;
 }
 
-pub struct TextureActivationProxy<'a, Texture: TextureType> {
+pub struct ShaderProgramTexture<'a, Texture: TextureType> {
     texture: &'a Texture,
     index: u32,
 }
 
-impl<'a, Texture: TextureType> TextureActivationProxy<'a, Texture> {
+impl<'a, Texture: TextureType> ShaderProgramTexture<'a, Texture> {
     pub fn new(
         texture: &'a Texture,
         shader_program: &ShaderProgram,
@@ -148,7 +148,7 @@ impl<'a, Texture: TextureType> TextureActivationProxy<'a, Texture> {
         Ok(Self { texture, index })
     }
 
-    pub fn activate(&self) -> anyhow::Result<()> {
+    pub fn draw(&self) -> anyhow::Result<()> {
         opengl::active_texture(self.index)?;
         self.texture.bind()?;
         Ok(())

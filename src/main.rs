@@ -79,12 +79,12 @@ fn main() -> anyhow::Result<()> {
         front: skybox_dir.join("front.jpg"),
     })?;
 
-    let splatoon_proxy =
-        TextureActivationProxy::new(&splatoon_texture, &cube_shader_program, "tex1", 0)?;
-    let ship_c_proxy =
-        TextureActivationProxy::new(&ship_c_texture, &cube_shader_program, "tex2", 1)?;
-    let skybox_proxy =
-        TextureActivationProxy::new(&skybox_texture, &skybox_shader_program, "skybox", 0)?;
+    let splatoon_shader_texture =
+        ShaderProgramTexture::new(&splatoon_texture, &cube_shader_program, "tex1", 0)?;
+    let ship_c_shader_texture =
+        ShaderProgramTexture::new(&ship_c_texture, &cube_shader_program, "tex2", 1)?;
+    let skybox_shader_texture =
+        ShaderProgramTexture::new(&skybox_texture, &skybox_shader_program, "skybox", 0)?;
 
     let cube_mesh = Mesh::create_and_bind(
         &cube::VERTICES,
@@ -172,8 +172,8 @@ fn main() -> anyhow::Result<()> {
         let camera_projection = camera.calculate_projection(window_size);
 
         cube_shader_program.enable().unwrap();
-        splatoon_proxy.activate().unwrap();
-        ship_c_proxy.activate().unwrap();
+        splatoon_shader_texture.draw().unwrap();
+        ship_c_shader_texture.draw().unwrap();
         set_uniform_mat4(cube_view_location, &camera_view).unwrap();
         set_uniform_mat4(cube_projection_location, &camera_projection).unwrap();
         for (position, orbit, rotation) in &cubes {
@@ -186,7 +186,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         unsafe { gl::DepthFunc(gl::LEQUAL) };
-        skybox_proxy.activate().unwrap();
+        skybox_shader_texture.draw().unwrap();
         skybox_shader_program.enable().unwrap();
         set_uniform_mat4(
             skybox_view_location,

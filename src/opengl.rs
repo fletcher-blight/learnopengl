@@ -520,6 +520,7 @@ pub enum TextureParameterValue {
     Linear,
     ClampToEdge,
     Repeat,
+    MirroredRepeat,
 }
 
 pub fn set_texture_parameter_value(
@@ -617,6 +618,7 @@ impl From<TextureParameterValue> for GLint {
             TextureParameterValue::Linear => gl::LINEAR,
             TextureParameterValue::ClampToEdge => gl::CLAMP_TO_EDGE,
             TextureParameterValue::Repeat => gl::REPEAT,
+            TextureParameterValue::MirroredRepeat => gl::MIRRORED_REPEAT,
         }) as _
     }
 }
