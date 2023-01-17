@@ -114,6 +114,7 @@ fn main() -> anyhow::Result<()> {
     const CAMERA_DRAG: f32 = 0.98;
     let mut camera = Camera::new();
     let mut camera_controls = CameraControls::default();
+    let mut play = true;
 
     let cubes: Vec<_> = create_random_vectors(1000, &mut rng)
         .into_iter()
@@ -135,9 +136,13 @@ fn main() -> anyhow::Result<()> {
         let seconds_since_last_frame = current_frame_instant
             .duration_since(last_frame_instant)
             .as_secs_f32();
-        let total_passed_seconds = current_frame_instant
-            .duration_since(start_instant)
-            .as_secs_f32();
+        let total_passed_seconds = if play {
+            current_frame_instant
+                .duration_since(start_instant)
+                .as_secs_f32()
+        } else {
+            0.0
+        };
 
         for event in events {
             match event {
@@ -150,9 +155,10 @@ fn main() -> anyhow::Result<()> {
                 Event::KeyDown(Keycode::S) => camera_controls.backward = CAMERA_ACCELERATION,
                 Event::KeyDown(Keycode::A) => camera_controls.left = CAMERA_ACCELERATION,
                 Event::KeyDown(Keycode::D) => camera_controls.right = CAMERA_ACCELERATION,
+                Event::KeyDown(Keycode::Space) => play = !play,
                 Event::KeyDown(_) => {}
                 Event::MousePosition(xrel, yrel) => {
-                    camera.move_orientation(*xrel * 0.1, *yrel * 0.1)
+                    camera.move_orientation(*xrel * 0.05, *yrel * 0.05)
                 }
                 Event::MouseScroll(offset) => camera.zoom(*offset * 10.0, seconds_since_last_frame),
             }
