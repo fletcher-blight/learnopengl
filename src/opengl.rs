@@ -450,19 +450,19 @@ pub fn vertex_attribute_pointer(
 
 impl VertexAttributeSize {
     pub fn as_value(&self) -> u32 {
-        *self as i32 as u32
-    }
-}
-
-impl From<VertexAttributeSize> for GLint {
-    fn from(value: VertexAttributeSize) -> Self {
-        match value {
+        match self {
             VertexAttributeSize::Single => 1,
             VertexAttributeSize::Double => 2,
             VertexAttributeSize::Triple => 3,
             VertexAttributeSize::Quadruple => 4,
             VertexAttributeSize::BGRA => gl::BGRA as _,
         }
+    }
+}
+
+impl From<VertexAttributeSize> for GLint {
+    fn from(value: VertexAttributeSize) -> Self {
+        value.as_value() as _
     }
 }
 
