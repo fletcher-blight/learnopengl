@@ -7,7 +7,7 @@ pub struct Vertex {
     tex_coords: [f32; 2],
 }
 
-const ATTRIBUTES: [BufferAttribute; 2] = [
+pub const ATTRIBUTES: [BufferAttribute; 2] = [
     BufferAttribute {
         data_type: opengl::DataType::F32,
         size: BufferAttributeSize::Triple,
@@ -17,12 +17,6 @@ const ATTRIBUTES: [BufferAttribute; 2] = [
         size: BufferAttributeSize::Double,
     },
 ];
-
-impl crate::BufferVertex for Vertex {
-    fn attribute_layout() -> &'static [BufferAttribute] {
-        &ATTRIBUTES
-    }
-}
 
 pub const VERTICES: [Vertex; 24] = [
     // Front

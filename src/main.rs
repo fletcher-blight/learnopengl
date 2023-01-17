@@ -86,9 +86,18 @@ fn main() -> anyhow::Result<()> {
     let skybox_proxy =
         TextureActivationProxy::new(&skybox_texture, &skybox_shader_program, "skybox", 0)?;
 
-    let cube_mesh =
-        Mesh::create_and_bind(&cube::VERTICES, Some(&cube::INDICES), DrawMode::Triangles)?;
-    let skybox_mesh = Mesh::create_and_bind(&skybox::VERTICES, None, DrawMode::Triangles)?;
+    let cube_mesh = Mesh::create_and_bind(
+        &cube::VERTICES,
+        &cube::ATTRIBUTES,
+        Some(&cube::INDICES),
+        DrawMode::Triangles,
+    )?;
+    let skybox_mesh = Mesh::create_and_bind(
+        &skybox::VERTICES,
+        &skybox::ATTRIBUTES,
+        None,
+        DrawMode::Triangles,
+    )?;
 
     log::info!("Loading assets ... complete");
 
@@ -162,9 +171,9 @@ fn main() -> anyhow::Result<()> {
         let camera_view = camera.calculate_view();
         let camera_projection = camera.calculate_projection(window_size);
 
+        cube_shader_program.enable().unwrap();
         splatoon_proxy.activate().unwrap();
         ship_c_proxy.activate().unwrap();
-        cube_shader_program.enable().unwrap();
         set_uniform_mat4(cube_view_location, &camera_view).unwrap();
         set_uniform_mat4(cube_projection_location, &camera_projection).unwrap();
         for (position, orbit, rotation) in &cubes {

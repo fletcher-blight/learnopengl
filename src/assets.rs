@@ -8,9 +8,8 @@ use anyhow::Context;
 use image::{ColorType, DynamicImage};
 use std::path::Path;
 
-pub use opengl::BufferTarget;
-pub use opengl::DrawMode;
 pub use opengl::VertexAttributeSize as BufferAttributeSize;
+pub use opengl::{BufferTarget, DataType, DrawMode};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -52,20 +51,7 @@ pub struct Buffer {
 #[derive(Copy, Clone)]
 pub struct BufferAttribute {
     pub size: BufferAttributeSize,
-    pub data_type: opengl::DataType,
-}
-
-pub trait BufferVertex {
-    fn attribute_layout() -> &'static [BufferAttribute];
-}
-
-impl BufferVertex for u32 {
-    fn attribute_layout() -> &'static [BufferAttribute] {
-        &[BufferAttribute {
-            size: opengl::VertexAttributeSize::Single,
-            data_type: opengl::DataType::U32,
-        }]
-    }
+    pub data_type: DataType,
 }
 
 impl Buffer {
@@ -77,18 +63,22 @@ impl Buffer {
         }
     }
 
-    pub fn bind<Vertex: BufferVertex>(&mut self, vertices: &[Vertex]) -> anyhow::Result<()> {
+    pub fn bind<Vertex>(
+        &mut self,
+        vertices: &[Vertex],
+        attribute_layout: &[BufferAttribute],
+    ) -> anyhow::Result<()> {
         opengl::bind_buffer(self.id, self.target)?;
         opengl::set_buffer_data(self.target, opengl::BufferUsage::StaticDraw, vertices)?;
+        self.size = vertices.len() as _;
 
-        let attributes = Vertex::attribute_layout();
-        let stride = attributes
+        let stride = attribute_layout
             .iter()
             .map(|attribute| attribute.size.as_value() * attribute.data_type.num_bytes())
             .sum();
 
         let mut offset = 0;
-        for (index, attribute) in attributes.iter().enumerate() {
+        for (index, attribute) in attribute_layout.iter().enumerate() {
             opengl::enable_vertex_attribute_array(index as _)?;
             opengl::vertex_attribute_pointer(
                 index as _,
@@ -102,7 +92,6 @@ impl Buffer {
             offset += attribute.size.as_value() * attribute.data_type.num_bytes();
         }
 
-        self.size = vertices.len() as _;
         Ok(())
     }
 }
@@ -204,11 +193,11 @@ impl TextureImage2D {
         opengl::load_texture_image2d(
             opengl::TextureTarget::Image2D,
             0,
-            opengl::TextureFormat::RGBA,
+            opengl::TextureFormat::RGB,
             image.width() as _,
             image.height() as _,
             format,
-            opengl::DataType::U8,
+            DataType::U8,
             image.as_bytes(),
         )?;
         opengl::generate_mipmaps(opengl::TextureTarget::Image2D)?;
@@ -310,7 +299,7 @@ impl TextureCubeMap {
                 image.width() as _,
                 image.height() as _,
                 format,
-                opengl::DataType::U8,
+                DataType::U8,
                 image.as_bytes(),
             )?;
         }
@@ -350,8 +339,9 @@ impl Mesh {
         }
     }
 
-    pub fn create_and_bind<Vertex: BufferVertex>(
-        buffer_data: &[Vertex],
+    pub fn create_and_bind<Vertex>(
+        vertices: &[Vertex],
+        attribute_layout: &[BufferAttribute],
         indices: Option<&[u32]>,
         draw_mode: DrawMode,
     ) -> anyhow::Result<Self> {
@@ -359,10 +349,11 @@ impl Mesh {
         let mut vbo = Buffer::new(BufferTarget::Array);
 
         vao.bind()?;
-        vbo.bind(buffer_data)?;
+        vbo.bind(vertices, attribute_layout)?;
+
         let ebo = if let Some(indices) = indices {
             let mut buffer = Buffer::new(BufferTarget::ElementArray);
-            buffer.bind(indices)?;
+            buffer.bind(indices, Default::default())?;
             Some(buffer)
         } else {
             None
@@ -381,7 +372,7 @@ impl Mesh {
         self.vao.bind()?;
 
         if let Some(ebo) = &self.ebo {
-            opengl::draw_elements(self.draw_mode, ebo.size, opengl::DataType::U32)?;
+            opengl::draw_elements(self.draw_mode, ebo.size, DataType::U32)?;
         } else {
             opengl::draw_arrays(self.draw_mode, 0, self.vbo.size)?;
         }

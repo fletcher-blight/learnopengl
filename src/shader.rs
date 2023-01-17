@@ -92,6 +92,6 @@ impl ShaderProgram {
 
     pub fn locate_uniform(&self, name: &str) -> anyhow::Result<opengl::UniformLocation> {
         let location = opengl::get_uniform_location(self.id, name)?;
-        Ok(location.ok_or(Error::MissingUniform(name.into()))?)
+        Ok(location.ok_or_else(|| Error::MissingUniform(name.into()))?)
     }
 }
