@@ -9,11 +9,8 @@ fn main() -> anyhow::Result<()> {
     ])?;
 
     let asset_dir = std::env::current_dir()?.join("assets");
-    // let image_dir = asset_dir.join("images");
     let skybox_dir = asset_dir.join("skyboxes");
 
-    // let cube_texture =
-    //     opengl::TextureImage2D::load_from_file(&image_dir.join("splatoon-face.jpeg"))?;
     let skybox_texture = opengl::TextureCubeMap::load_from_file(&opengl::CubeMap {
         right: skybox_dir.join("right.jpg"),
         left: skybox_dir.join("left.jpg"),
@@ -23,28 +20,8 @@ fn main() -> anyhow::Result<()> {
         front: skybox_dir.join("front.jpg"),
     })?;
 
-    // let cube_shader_texture =
-    //     opengl::ShaderProgramTexture::new(&cube_texture, &shader_program, "tex", 0)?;
     let skybox_shader_texture =
         opengl::ShaderProgramTexture::new(&skybox_texture, &shader_program, "skybox", 0)?;
-
-    // let cube_mesh = opengl::Mesh::create_and_bind(
-    //     &[
-    //         [0.0f32, 0.0, 0.0],
-    //         [10.0, 0.0, 0.0],
-    //         [-10.0, 0.0, 0.0],
-    //         [0.0, 10.0, 0.0],
-    //         [0.0, -10.0, 0.0],
-    //         [0.0, 0.0, 10.0],
-    //         [0.0, 0.0, -10.0],
-    //     ],
-    //     &[opengl::BufferAttribute {
-    //         size: opengl_sys::VertexAttributeSize::Triple,
-    //         data_type: opengl_sys::DataType::F32,
-    //     }],
-    //     None,
-    //     opengl_sys::DrawMode::Points,
-    // )?;
 
     #[rustfmt::skip]
     let vertices = [
@@ -93,7 +70,7 @@ fn main() -> anyhow::Result<()> {
             data_type: opengl_sys::DataType::F32,
         }],
         None,
-        opengl_sys::DrawMode::Points,
+        opengl_sys::DrawMode::Triangles,
     )?;
 
     let mut camera = camera::Camera::new();
@@ -101,7 +78,6 @@ fn main() -> anyhow::Result<()> {
 
     camera.set_position(&[0.0, 0.0, 3.0]);
 
-    // let model_location = shader_program.locate_uniform("model")?;
     let view_location = shader_program.locate_uniform("view")?;
     let projection_location = shader_program.locate_uniform("projection")?;
 
@@ -122,10 +98,10 @@ fn main() -> anyhow::Result<()> {
         set_mat4(view_location, &camera_view);
         set_mat4(projection_location, &camera_projection);
 
-        // opengl_sys::set_depth_func(opengl_sys::DepthFunc::LessEqual);
+        opengl_sys::set_depth_func(opengl_sys::DepthFunc::LessEqual);
         skybox_shader_texture.draw().unwrap();
         skybox_mesh.draw().unwrap();
-        // opengl_sys::set_depth_func(opengl_sys::DepthFunc::Less);
+        opengl_sys::set_depth_func(opengl_sys::DepthFunc::Less);
     })
 }
 
