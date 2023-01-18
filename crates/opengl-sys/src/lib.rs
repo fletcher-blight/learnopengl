@@ -1,4 +1,3 @@
-extern crate anyhow;
 extern crate gl;
 extern crate thiserror;
 
@@ -85,6 +84,7 @@ impl From<DataType> for GLenum {
 
 #[derive(Copy, Clone, Debug)]
 pub enum DrawMode {
+    Points,
     Triangles,
 }
 
@@ -108,6 +108,7 @@ pub fn draw_elements(mode: DrawMode, num_indices: u64, index_type: DataType) -> 
 impl From<DrawMode> for GLenum {
     fn from(value: DrawMode) -> Self {
         match value {
+            DrawMode::Points => gl::POINTS,
             DrawMode::Triangles => gl::TRIANGLES,
         }
     }
@@ -132,8 +133,8 @@ pub fn delete_shader(shader_id: ShaderID) -> Result<(), Error> {
     assert_no_error()
 }
 
-pub fn set_shader_source(id: ShaderID, source: &str) -> anyhow::Result<()> {
-    let source_str = CString::new(source)?;
+pub fn set_shader_source(id: ShaderID, source: &str) -> Result<(), Error> {
+    let source_str = CString::new(source).map_err(|_| Error::InvalidValue)?;
     unsafe {
         gl::ShaderSource(
             id,
@@ -504,6 +505,25 @@ pub fn bind_texture(texture_id: TextureID, texture_target: TextureTarget) -> Res
 pub fn active_texture(texture_index: u32) -> Result<(), Error> {
     unsafe { gl::ActiveTexture(gl::TEXTURE0 + texture_index) };
     assert_no_error()
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum DepthFunc {
+    Less,
+    LessEqual,
+}
+
+pub fn set_depth_func(func: DepthFunc) {
+    unsafe { gl::DepthFunc(func.into()) };
+}
+
+impl From<DepthFunc> for GLenum {
+    fn from(value: DepthFunc) -> Self {
+        match value {
+            DepthFunc::Less => gl::LESS,
+            DepthFunc::LessEqual => gl::LEQUAL,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

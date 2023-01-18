@@ -1,0 +1,10 @@
+[package]
+name = "camera"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+nalgebra-glm = "0.18"
+winman = { path="../winman" }

@@ -60,10 +60,14 @@ impl Window {
 
     pub fn run<F>(self, mut game_logic: F) -> anyhow::Result<()>
     where
-        F: FnMut((u32, u32), &[Event]),
+        F: FnMut((u32, u32), (f32, f32), &[Event]),
     {
         let mut events = Vec::with_capacity(50);
         let mut event_pump = self.sdl.event_pump().map_err(Error::SDL)?;
+
+        let start_instant = std::time::Instant::now();
+        let mut last_frame_instant = start_instant;
+        let mut current_frame_instant = start_instant;
 
         'main: loop {
             events.clear();
@@ -96,9 +100,24 @@ impl Window {
                 }
             }
 
-            game_logic(self.window.size(), &events);
+            unsafe { gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT) };
 
+            current_frame_instant = std::time::Instant::now();
+            let seconds_since_last_frame = current_frame_instant
+                .duration_since(last_frame_instant)
+                .as_secs_f32();
+            let total_passed_seconds = current_frame_instant
+                .duration_since(start_instant)
+                .as_secs_f32();
+
+            game_logic(
+                self.window.size(),
+                (total_passed_seconds, seconds_since_last_frame),
+                &events,
+            );
             self.window.gl_swap_window();
+
+            last_frame_instant = current_frame_instant;
         }
         Ok(())
     }
