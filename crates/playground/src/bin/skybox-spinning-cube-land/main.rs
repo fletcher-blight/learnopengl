@@ -1,18 +1,10 @@
 use nalgebra_glm as glm;
 
 fn main() -> anyhow::Result<()> {
-    let window = winman::Window::new("1.5 Hello, Triangle", 1920, 1080)?;
+    let window = winman::Window::new("Playground: Skybox Spinning Cube Land", 1920, 1080)?;
 
     let shader_program = opengl::ShaderProgram::new(&[
-        opengl::Shader::new(include_str!("shader.vert"), opengl::ShaderType::Vertex)?,
-        opengl::Shader::new(
-            include_str!("skybox_emit_offests.geom"),
-            opengl::ShaderType::Geometry,
-        )?,
-        opengl::Shader::new(
-            include_str!("cube_faces.geom"),
-            opengl::ShaderType::Geometry,
-        )?,
+        opengl::Shader::new(include_str!("skybox.vert"), opengl::ShaderType::Vertex)?,
         opengl::Shader::new(include_str!("skybox.frag"), opengl::ShaderType::Fragment)?,
     ])?;
 
@@ -54,8 +46,48 @@ fn main() -> anyhow::Result<()> {
     //     opengl_sys::DrawMode::Points,
     // )?;
 
+    #[rustfmt::skip]
+    let vertices = [
+        [-1.0f32, 1.0, -1.0],
+        [-1.0, -1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, 1.0, -1.0],
+        [-1.0, 1.0, -1.0],
+        [-1.0, -1.0, 1.0],
+        [-1.0, -1.0, -1.0],
+        [-1.0, 1.0, -1.0],
+        [-1.0, 1.0, -1.0],
+        [-1.0, 1.0, 1.0],
+        [-1.0, -1.0, 1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, -1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [-1.0, -1.0, 1.0],
+        [-1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, -1.0, 1.0],
+        [-1.0, -1.0, 1.0],
+        [-1.0, 1.0, -1.0],
+        [1.0, 1.0, -1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [-1.0, 1.0, 1.0],
+        [-1.0, 1.0, -1.0],
+        [-1.0, -1.0, -1.0],
+        [-1.0, -1.0, 1.0],
+        [1.0, -1.0, -1.0],
+        [1.0, -1.0, -1.0],
+        [-1.0, -1.0, 1.0],
+        [1.0, -1.0, 1.0],
+    ];
+
     let skybox_mesh = opengl::Mesh::create_and_bind(
-        &[0.0, 0.0, 0.0f32],
+        &vertices,
         &[opengl::BufferAttribute {
             size: opengl_sys::VertexAttributeSize::Triple,
             data_type: opengl_sys::DataType::F32,
@@ -87,18 +119,13 @@ fn main() -> anyhow::Result<()> {
         let camera_projection = camera.calculate_projection(window_size);
 
         shader_program.enable().unwrap();
-        // set_mat4(model_location, &glm::one());
         set_mat4(view_location, &camera_view);
         set_mat4(projection_location, &camera_projection);
 
-        // opengl_sys::set_uniform_i32(skybox_mode_location, false as _).unwrap();
-        // cube_shader_texture.draw().unwrap();
-        // cube_mesh.draw().unwrap();
-
-        opengl_sys::set_depth_func(opengl_sys::DepthFunc::LessEqual);
+        // opengl_sys::set_depth_func(opengl_sys::DepthFunc::LessEqual);
         skybox_shader_texture.draw().unwrap();
         skybox_mesh.draw().unwrap();
-        opengl_sys::set_depth_func(opengl_sys::DepthFunc::Less);
+        // opengl_sys::set_depth_func(opengl_sys::DepthFunc::Less);
     })
 }
 

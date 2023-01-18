@@ -1,5 +1,5 @@
 fn main() -> anyhow::Result<()> {
-    let window = winman::Window::new("1.5 Hello, Triangle", 1920, 1080)?;
+    let window = winman::Window::new("1.7 Textures", 1920, 1080)?;
 
     let asset_dir = std::env::current_dir()?.join("assets");
     let image_dir = asset_dir.join("images");
