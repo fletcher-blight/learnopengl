@@ -61,10 +61,7 @@ fn main() -> anyhow::Result<()> {
 
     let mesh = opengl::Mesh::create_and_bind(
         &vertices,
-        &[opengl::BufferAttribute {
-            size: opengl_sys::VertexAttributeSize::Triple,
-            data_type: opengl_sys::DataType::F32,
-        }],
+        &[opengl::BufferAttributeSize::Triple.into()],
         None,
         opengl_sys::DrawMode::Triangles,
     )?;

@@ -25,10 +25,7 @@ fn main() -> anyhow::Result<()> {
             [0.0, 0.0, 10.0],
             [0.0, 0.0, -10.0],
         ],
-        &[opengl::BufferAttribute {
-            size: opengl_sys::VertexAttributeSize::Triple,
-            data_type: opengl_sys::DataType::F32,
-        }],
+        &[opengl::BufferAttributeSize::Triple.into()],
         None,
         opengl_sys::DrawMode::Points,
     )?;

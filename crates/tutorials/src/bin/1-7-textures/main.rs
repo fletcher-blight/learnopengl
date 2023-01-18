@@ -14,10 +14,7 @@ fn main() -> anyhow::Result<()> {
 
     let mesh = opengl::Mesh::create_and_bind(
         &[[-0.5, -0.5], [0.0, 0.5], [0.5, -0.5f32]],
-        &[opengl::BufferAttribute {
-            size: opengl_sys::VertexAttributeSize::Double,
-            data_type: opengl_sys::DataType::F32,
-        }],
+        &[opengl::BufferAttributeSize::Double.into()],
         None,
         opengl_sys::DrawMode::Triangles,
     )?;

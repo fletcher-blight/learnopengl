@@ -36,6 +36,27 @@ pub struct Buffer {
 pub struct BufferAttribute {
     pub size: BufferAttributeSize,
     pub data_type: DataType,
+    pub divisor: u32,
+}
+
+impl From<BufferAttributeSize> for BufferAttribute {
+    fn from(size: BufferAttributeSize) -> Self {
+        BufferAttribute {
+            size,
+            data_type: DataType::F32,
+            divisor: 0,
+        }
+    }
+}
+
+impl From<(BufferAttributeSize, DataType)> for BufferAttribute {
+    fn from((size, data_type): (BufferAttributeSize, DataType)) -> Self {
+        BufferAttribute {
+            size,
+            data_type,
+            divisor: 0,
+        }
+    }
 }
 
 impl Buffer {

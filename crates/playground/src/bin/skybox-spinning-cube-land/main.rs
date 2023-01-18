@@ -1,4 +1,5 @@
 use nalgebra_glm as glm;
+use rand::Rng;
 
 fn main() -> anyhow::Result<()> {
     let window = winman::Window::new("Playground: Skybox Spinning Cube Land", 1920, 1080)?;
@@ -120,18 +121,16 @@ fn main() -> anyhow::Result<()> {
     let cube_mesh = opengl::Mesh::create_and_bind(
         &cube_vertices,
         &[opengl::BufferAttribute {
-            size: opengl_sys::VertexAttributeSize::Triple,
+            size: opengl::BufferAttributeSize::Triple,
             data_type: opengl_sys::DataType::F32,
+            divisor: 0,
         }],
         None,
         opengl_sys::DrawMode::Triangles,
     )?;
     let skybox_mesh = opengl::Mesh::create_and_bind(
         &skybox_vertices,
-        &[opengl::BufferAttribute {
-            size: opengl_sys::VertexAttributeSize::Triple,
-            data_type: opengl_sys::DataType::F32,
-        }],
+        &[opengl::BufferAttributeSize::Triple.into()],
         None,
         opengl_sys::DrawMode::Triangles,
     )?;
@@ -147,6 +146,8 @@ fn main() -> anyhow::Result<()> {
     let mut camera_controls = camera::Controls::default();
 
     camera.set_position(&[0.0, 0.0, 3.0]);
+
+    let mut rng = rand::thread_rng();
 
     window.run(|window_size, (_, seconds_since_last_frame), events| {
         camera::process_events(
@@ -182,4 +183,12 @@ fn set_mat4(location: opengl::UniformLocation, mat4: &glm::Mat4) {
     opengl_sys::set_uniform_mat4(location, false, glm::value_ptr(mat4)).unwrap();
 }
 
-fn generate_random_cube() {}
+fn generate_random_cube(rng: &mut rand::rngs::ThreadRng) -> () {}
+
+fn generate_random_vec(rng: &mut rand::rngs::ThreadRng) -> [f32; 3] {
+    [
+        rng.gen_range(-100.0..100.0),
+        rng.gen_range(-100.0..100.0),
+        rng.gen_range(-100.0..100.0),
+    ]
+}

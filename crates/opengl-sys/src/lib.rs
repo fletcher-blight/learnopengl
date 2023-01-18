@@ -325,6 +325,16 @@ pub fn set_uniform_i32(location: UniformLocation, data: i32) -> Result<(), Error
     assert_no_error()
 }
 
+pub fn set_uniform_vec2(location: UniformLocation, data: &[f32; 2]) -> Result<(), Error> {
+    unsafe { gl::Uniform2fv(location as _, 1, data.as_ptr()) };
+    assert_no_error()
+}
+
+pub fn set_uniform_vec3(location: UniformLocation, data: &[f32; 3]) -> Result<(), Error> {
+    unsafe { gl::Uniform3fv(location as _, 1, data.as_ptr()) };
+    assert_no_error()
+}
+
 pub fn set_uniform_mat4(
     location: UniformLocation,
     transpose: bool,
@@ -416,6 +426,11 @@ pub fn bind_vertex_array(vertex_array_id: VertexArrayID) -> Result<(), Error> {
 
 pub fn enable_vertex_attribute_array(index: u32) -> Result<(), Error> {
     unsafe { gl::EnableVertexAttribArray(index) };
+    assert_no_error()
+}
+
+pub fn set_vertex_attribute_divisor(attribute_index: u32, divisor: u32) -> Result<(), Error> {
+    unsafe { gl::VertexAttribDivisor(attribute_index, divisor) };
     assert_no_error()
 }
 
