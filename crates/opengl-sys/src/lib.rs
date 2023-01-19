@@ -355,6 +355,11 @@ pub fn set_uniform_i32(location: UniformLocation, data: i32) -> Result<(), Error
     assert_no_error()
 }
 
+pub fn set_uniform_f32(location: UniformLocation, data: f32) -> Result<(), Error> {
+    unsafe { gl::Uniform1f(location as _, data) };
+    assert_no_error()
+}
+
 pub fn set_uniform_vec2(location: UniformLocation, data: &[f32; 2]) -> Result<(), Error> {
     unsafe { gl::Uniform2fv(location as _, 1, data.as_ptr()) };
     assert_no_error()

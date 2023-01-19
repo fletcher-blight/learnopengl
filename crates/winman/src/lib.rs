@@ -67,7 +67,6 @@ impl Window {
 
         let start_instant = std::time::Instant::now();
         let mut last_frame_instant = start_instant;
-        let mut current_frame_instant = start_instant;
 
         'main: loop {
             events.clear();
@@ -102,7 +101,7 @@ impl Window {
 
             unsafe { gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT) };
 
-            current_frame_instant = std::time::Instant::now();
+            let current_frame_instant = std::time::Instant::now();
             let seconds_since_last_frame = current_frame_instant
                 .duration_since(last_frame_instant)
                 .as_secs_f32();
