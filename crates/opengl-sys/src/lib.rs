@@ -1,6 +1,3 @@
-extern crate gl;
-extern crate thiserror;
-
 use gl::types::*;
 use std::ffi::CString;
 

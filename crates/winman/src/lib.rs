@@ -1,6 +1,3 @@
-extern crate sdl2;
-extern crate thiserror;
-
 use sdl2::event::WindowEvent;
 use sdl2::video::GLContext;
 use sdl2::{Sdl, VideoSubsystem};
