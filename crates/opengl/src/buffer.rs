@@ -32,7 +32,7 @@ pub struct Buffer {
     pub(crate) size: u64,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct BufferAttribute {
     pub index: u32,
     pub size: BufferAttributeSize,

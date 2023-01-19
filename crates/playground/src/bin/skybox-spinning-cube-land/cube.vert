@@ -1,7 +1,8 @@
 #version 330 core
 
-in vec3 position;
-in vec3 offset;
+layout (location=1) in vec3 position;
+layout (location=2) in vec3 offset;
+
 out vec2 tex_coords;
 
 uniform mat4 projection;

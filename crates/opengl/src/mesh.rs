@@ -49,7 +49,7 @@ impl Mesh {
         };
 
         let instance_buffer = if let Some((instances, layout)) = instances {
-            let mut instance_buffer = Buffer::new(BufferTarget::ElementArray);
+            let mut instance_buffer = Buffer::new(BufferTarget::Array);
             instance_buffer.bind(instances, layout)?;
             Some(instance_buffer)
         } else {
