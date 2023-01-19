@@ -77,6 +77,8 @@ fn main() -> anyhow::Result<()> {
     let object_projection_location = object_shader_program.locate_uniform("projection")?;
     let object_object_colour_location = object_shader_program.locate_uniform("object_colour")?;
     let object_light_colour_location = object_shader_program.locate_uniform("light_colour")?;
+    let object_light_pos_location = object_shader_program.locate_uniform("light_pos")?;
+    let object_view_pos_location = object_shader_program.locate_uniform("view_pos")?;
     opengl_sys::set_uniform_vec3(object_object_colour_location, &[1.0, 0.5, 0.31])?;
     opengl_sys::set_uniform_vec3(object_light_colour_location, &[1.0, 1.0, 1.0])?;
 
@@ -103,6 +105,12 @@ fn main() -> anyhow::Result<()> {
             object_projection_location,
             &camera.calculate_projection(window_size),
         );
+        opengl_sys::set_uniform_vec3(
+            object_light_pos_location,
+            &[light_pos.x, light_pos.y, light_pos.z],
+        )
+        .unwrap();
+        opengl_sys::set_uniform_vec3(object_view_pos_location, &camera.get_position()).unwrap();
         mesh.draw(opengl::DrawMode::Triangles).unwrap();
 
         light_shader_program.enable().unwrap();
