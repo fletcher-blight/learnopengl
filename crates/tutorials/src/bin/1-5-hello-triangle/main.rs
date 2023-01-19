@@ -6,15 +6,10 @@ fn main() -> anyhow::Result<()> {
         opengl::Shader::new(include_str!("shader.frag"), opengl::ShaderType::Fragment)?,
     ])?;
 
-    let mesh = opengl::Mesh::create_and_bind(
-        &[[-0.5, -0.5], [0.0, 0.5], [0.5, -0.5f32]],
-        &[opengl::BufferAttributeSize::Double.into()],
-        None,
-        opengl_sys::DrawMode::Triangles,
-    )?;
+    let mesh: opengl::Mesh = ([[-0.5, -0.5], [0.0, 0.5], [0.5, -0.5f32]].as_slice()).try_into()?;
 
     window.run(|_, _, _| {
         shader_program.enable().unwrap();
-        mesh.draw().unwrap();
+        mesh.draw(opengl::DrawMode::Triangles).unwrap();
     })
 }

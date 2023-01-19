@@ -1,64 +1,70 @@
-pub use opengl_sys::{ DataType, DrawMode };
+pub use opengl_sys::{DataType, DrawMode};
 
-use opengl_sys::BufferTarget;
 use crate::buffer::*;
+use opengl_sys::BufferTarget;
 
 #[derive(Clone)]
 pub struct Mesh {
-    vao: VertexArray,
-    vbo: Buffer,
-    ebo: Option<Buffer>,
-    draw_mode: DrawMode,
+    vertex_array: VertexArray,
+    vertex_buffer: Buffer,
+    index_buffer: Option<Buffer>,
+    instance_buffer: Option<Buffer>,
+}
+
+impl<const N: usize> TryFrom<&[[f32; N]]> for Mesh {
+    type Error = anyhow::Error;
+    fn try_from(vertices: &[[f32; N]]) -> Result<Self, Self::Error> {
+        let attribute_size = match N {
+            2 => BufferAttributeSize::Double,
+            3 => BufferAttributeSize::Triple,
+            _ => anyhow::bail!("Invalid Buffer Size"),
+        };
+
+        let vertex_array = VertexArray::new();
+        let mut vertex_buffer = Buffer::new(BufferTarget::Array);
+
+        vertex_array.bind()?;
+        vertex_buffer.bind(vertices, &[(0, attribute_size).into()])?;
+        opengl_sys::bind_vertex_array(0)?;
+
+        Ok(Mesh {
+            vertex_array,
+            vertex_buffer,
+            index_buffer: None,
+            instance_buffer: None,
+        })
+    }
 }
 
 impl Mesh {
-    pub fn new(vao: VertexArray, vbo: Buffer, ebo: Option<Buffer>, draw_mode: DrawMode) -> Self {
-        Self {
-            vao,
-            vbo,
-            ebo,
-            draw_mode,
-        }
-    }
+    pub fn draw(&self, draw_mode: DrawMode) -> anyhow::Result<()> {
+        self.vertex_array.bind()?;
 
-    pub fn create_and_bind<Vertex>(
-        vertices: &[Vertex],
-        attribute_layout: &[BufferAttribute],
-        indices: Option<&[u32]>,
-        draw_mode: DrawMode,
-    ) -> anyhow::Result<Self> {
-        let vao = VertexArray::new();
-        let mut vbo = Buffer::new(BufferTarget::Array);
-
-        vao.bind()?;
-        vbo.bind(vertices, attribute_layout)?;
-
-        let ebo = if let Some(indices) = indices {
-            let mut buffer = Buffer::new(BufferTarget::ElementArray);
-            buffer.bind(indices, Default::default())?;
-            Some(buffer)
+        if let Some(ibo) = &self.instance_buffer {
+            if let Some(ebo) = &self.index_buffer {
+                opengl_sys::draw_elements_instanced(
+                    draw_mode,
+                    ebo.size,
+                    DataType::U32,
+                    ibo.size as _,
+                )?;
+            } else {
+                opengl_sys::draw_arrays_instanced(
+                    draw_mode,
+                    0,
+                    self.vertex_buffer.size,
+                    ibo.size as _,
+                )?;
+            }
         } else {
-            None
-        };
+            if let Some(ebo) = &self.index_buffer {
+                opengl_sys::draw_elements(draw_mode, ebo.size, DataType::U32)?;
+            } else {
+                opengl_sys::draw_arrays(draw_mode, 0, self.vertex_buffer.size)?;
+            }
+        }
 
         opengl_sys::bind_vertex_array(0)?;
-        Ok(Self {
-            vao,
-            vbo,
-            ebo,
-            draw_mode,
-        })
-    }
-
-    pub fn draw(&self) -> anyhow::Result<()> {
-        self.vao.bind()?;
-
-        if let Some(ebo) = &self.ebo {
-            opengl_sys::draw_elements(self.draw_mode, ebo.size, DataType::U32)?;
-        } else {
-            opengl_sys::draw_arrays(self.draw_mode, 0, self.vbo.size)?;
-        }
-
         Ok(())
     }
 }

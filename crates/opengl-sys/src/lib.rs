@@ -93,6 +93,18 @@ pub fn draw_arrays(mode: DrawMode, starting_index: u64, count: u64) -> Result<()
     assert_no_error()
 }
 
+pub fn draw_arrays_instanced(
+    mode: DrawMode,
+    starting_index: u64,
+    count: u64,
+    instances: u32,
+) -> Result<(), Error> {
+    unsafe {
+        gl::DrawArraysInstanced(mode.into(), starting_index as _, count as _, instances as _)
+    };
+    assert_no_error()
+}
+
 pub fn draw_elements(mode: DrawMode, num_indices: u64, index_type: DataType) -> Result<(), Error> {
     unsafe {
         gl::DrawElements(
@@ -100,6 +112,24 @@ pub fn draw_elements(mode: DrawMode, num_indices: u64, index_type: DataType) -> 
             num_indices as _,
             index_type.into(),
             std::ptr::null(),
+        )
+    };
+    assert_no_error()
+}
+
+pub fn draw_elements_instanced(
+    mode: DrawMode,
+    num_indices: u64,
+    index_type: DataType,
+    instances: u32,
+) -> Result<(), Error> {
+    unsafe {
+        gl::DrawElementsInstanced(
+            mode.into(),
+            num_indices as _,
+            index_type.into(),
+            std::ptr::null(),
+            instances as _,
         )
     };
     assert_no_error()

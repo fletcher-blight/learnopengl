@@ -1,6 +1,7 @@
 #version 330 core
 
 in vec3 position;
+in vec3 offset;
 out vec2 tex_coords;
 
 uniform mat4 projection;
@@ -14,5 +15,5 @@ void main() {
         case 2: case 4: tex_coords = vec2(1.0, 1.0); break;
         case 5:         tex_coords = vec2(1.0, 0.0); break;
     }
-    gl_Position = projection * view * model * vec4(position, 1.0);
+    gl_Position = projection * view * model * vec4(position + offset, 1.0);
 }

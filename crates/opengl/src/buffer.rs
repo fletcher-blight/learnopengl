@@ -34,14 +34,16 @@ pub struct Buffer {
 
 #[derive(Copy, Clone)]
 pub struct BufferAttribute {
+    pub index: u32,
     pub size: BufferAttributeSize,
     pub data_type: DataType,
     pub divisor: u32,
 }
 
-impl From<BufferAttributeSize> for BufferAttribute {
-    fn from(size: BufferAttributeSize) -> Self {
+impl From<(u32, BufferAttributeSize)> for BufferAttribute {
+    fn from((index, size): (u32, BufferAttributeSize)) -> Self {
         BufferAttribute {
+            index,
             size,
             data_type: DataType::F32,
             divisor: 0,
@@ -49,9 +51,10 @@ impl From<BufferAttributeSize> for BufferAttribute {
     }
 }
 
-impl From<(BufferAttributeSize, DataType)> for BufferAttribute {
-    fn from((size, data_type): (BufferAttributeSize, DataType)) -> Self {
+impl From<(u32, BufferAttributeSize, DataType)> for BufferAttribute {
+    fn from((index, size, data_type): (u32, BufferAttributeSize, DataType)) -> Self {
         BufferAttribute {
+            index,
             size,
             data_type,
             divisor: 0,
@@ -83,16 +86,17 @@ impl Buffer {
             .sum();
 
         let mut offset = 0;
-        for (index, attribute) in attribute_layout.iter().enumerate() {
-            opengl_sys::enable_vertex_attribute_array(index as _)?;
+        for attribute in attribute_layout {
+            opengl_sys::enable_vertex_attribute_array(attribute.index as _)?;
             opengl_sys::vertex_attribute_pointer(
-                index as _,
+                attribute.index as _,
                 attribute.size,
                 attribute.data_type,
                 false,
                 stride,
                 offset,
             )?;
+            opengl_sys::set_vertex_attribute_divisor(attribute.index as _, attribute.divisor)?;
 
             offset += attribute.size.as_value() * attribute.data_type.num_bytes();
         }

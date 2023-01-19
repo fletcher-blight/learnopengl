@@ -59,12 +59,7 @@ fn main() -> anyhow::Result<()> {
         [-0.5, -0.5, -0.5],
     ];
 
-    let mesh = opengl::Mesh::create_and_bind(
-        &vertices,
-        &[opengl::BufferAttributeSize::Triple.into()],
-        None,
-        opengl_sys::DrawMode::Triangles,
-    )?;
+    let mesh: opengl::Mesh = vertices.as_slice().try_into()?;
 
     let mut camera = camera::Camera::new();
     let mut camera_controls = camera::Controls::default();
@@ -107,6 +102,6 @@ fn main() -> anyhow::Result<()> {
         )
         .unwrap();
 
-        mesh.draw().unwrap();
+        mesh.draw(opengl::DrawMode::Triangles).unwrap();
     })
 }

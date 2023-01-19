@@ -78,6 +78,16 @@ fn main() -> anyhow::Result<()> {
         [-0.5, -0.5, -0.5],
     ];
 
+    let cube_offests = [
+        [0.0f32, 0.0, 0.0],
+        [10.0, 0.0, 0.0],
+        [-10.0, 0.0, 0.0],
+        [0.0, 10.0, 0.0],
+        [0.0, -10.0, 0.0],
+        [0.0, 0.0, 10.0],
+        [0.0, 0.0, -10.0],
+    ];
+
     #[rustfmt::skip]
     let skybox_vertices = [
         [-1.0f32, 1.0, -1.0],
@@ -86,30 +96,35 @@ fn main() -> anyhow::Result<()> {
         [1.0, -1.0, -1.0],
         [1.0, 1.0, -1.0],
         [-1.0, 1.0, -1.0],
+        
         [-1.0, -1.0, 1.0],
         [-1.0, -1.0, -1.0],
         [-1.0, 1.0, -1.0],
         [-1.0, 1.0, -1.0],
         [-1.0, 1.0, 1.0],
         [-1.0, -1.0, 1.0],
+        
         [1.0, -1.0, -1.0],
         [1.0, -1.0, 1.0],
         [1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
         [1.0, 1.0, -1.0],
         [1.0, -1.0, -1.0],
+        
         [-1.0, -1.0, 1.0],
         [-1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
         [1.0, -1.0, 1.0],
         [-1.0, -1.0, 1.0],
+        
         [-1.0, 1.0, -1.0],
         [1.0, 1.0, -1.0],
         [1.0, 1.0, 1.0],
         [1.0, 1.0, 1.0],
         [-1.0, 1.0, 1.0],
         [-1.0, 1.0, -1.0],
+        
         [-1.0, -1.0, -1.0],
         [-1.0, -1.0, 1.0],
         [1.0, -1.0, -1.0],
@@ -118,22 +133,8 @@ fn main() -> anyhow::Result<()> {
         [1.0, -1.0, 1.0],
     ];
 
-    let cube_mesh = opengl::Mesh::create_and_bind(
-        &cube_vertices,
-        &[opengl::BufferAttribute {
-            size: opengl::BufferAttributeSize::Triple,
-            data_type: opengl_sys::DataType::F32,
-            divisor: 0,
-        }],
-        None,
-        opengl_sys::DrawMode::Triangles,
-    )?;
-    let skybox_mesh = opengl::Mesh::create_and_bind(
-        &skybox_vertices,
-        &[opengl::BufferAttributeSize::Triple.into()],
-        None,
-        opengl_sys::DrawMode::Triangles,
-    )?;
+    let cube_mesh: opengl::Mesh = cube_vertices.as_slice().try_into()?;
+    let skybox_mesh: opengl::Mesh = skybox_vertices.as_slice().try_into()?;
 
     let cube_model_location = cube_shader_program.locate_uniform("model")?;
     let cube_view_location = cube_shader_program.locate_uniform("view")?;
@@ -146,8 +147,6 @@ fn main() -> anyhow::Result<()> {
     let mut camera_controls = camera::Controls::default();
 
     camera.set_position(&[0.0, 0.0, 3.0]);
-
-    let mut rng = rand::thread_rng();
 
     window.run(|window_size, (_, seconds_since_last_frame), events| {
         camera::process_events(
@@ -167,28 +166,18 @@ fn main() -> anyhow::Result<()> {
         set_mat4(cube_view_location, &camera_view);
         set_mat4(cube_projection_location, &camera_projection);
         cube_shader_texture.draw().unwrap();
-        cube_mesh.draw().unwrap();
+        cube_mesh.draw(opengl::DrawMode::Triangles).unwrap();
 
         skybox_shader_program.enable().unwrap();
         set_mat4(skybox_view_location, &camera_view);
         set_mat4(skybox_projection_location, &camera_projection);
         skybox_shader_texture.draw().unwrap();
         opengl_sys::set_depth_func(opengl_sys::DepthFunc::LessEqual);
-        skybox_mesh.draw().unwrap();
+        skybox_mesh.draw(opengl::DrawMode::Triangles).unwrap();
         opengl_sys::set_depth_func(opengl_sys::DepthFunc::Less);
     })
 }
 
 fn set_mat4(location: opengl::UniformLocation, mat4: &glm::Mat4) {
     opengl_sys::set_uniform_mat4(location, false, glm::value_ptr(mat4)).unwrap();
-}
-
-fn generate_random_cube(rng: &mut rand::rngs::ThreadRng) -> () {}
-
-fn generate_random_vec(rng: &mut rand::rngs::ThreadRng) -> [f32; 3] {
-    [
-        rng.gen_range(-100.0..100.0),
-        rng.gen_range(-100.0..100.0),
-        rng.gen_range(-100.0..100.0),
-    ]
 }

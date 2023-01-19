@@ -15,20 +15,17 @@ fn main() -> anyhow::Result<()> {
 
     let shader_texture = opengl::ShaderProgramTexture::new(&texture, &shader_program, "tex", 0)?;
 
-    let mesh = opengl::Mesh::create_and_bind(
-        &[
-            [0.0f32, 0.0, 0.0],
-            [10.0, 0.0, 0.0],
-            [-10.0, 0.0, 0.0],
-            [0.0, 10.0, 0.0],
-            [0.0, -10.0, 0.0],
-            [0.0, 0.0, 10.0],
-            [0.0, 0.0, -10.0],
-        ],
-        &[opengl::BufferAttributeSize::Triple.into()],
-        None,
-        opengl_sys::DrawMode::Points,
-    )?;
+    let mesh: opengl::Mesh = ([
+        [0.0f32, 0.0, 0.0],
+        [10.0, 0.0, 0.0],
+        [-10.0, 0.0, 0.0],
+        [0.0, 10.0, 0.0],
+        [0.0, -10.0, 0.0],
+        [0.0, 0.0, 10.0],
+        [0.0, 0.0, -10.0],
+    ]
+    .as_slice())
+    .try_into()?;
 
     let mut camera = camera::Camera::new();
     let mut camera_controls = camera::Controls::default();
@@ -59,7 +56,7 @@ fn main() -> anyhow::Result<()> {
             &camera.calculate_projection(window_size),
         );
 
-        mesh.draw().unwrap();
+        mesh.draw(opengl::DrawMode::Points).unwrap();
     })
 }
 
