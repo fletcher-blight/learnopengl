@@ -1,7 +1,7 @@
 use nalgebra_glm as glm;
 
 fn main() -> anyhow::Result<()> {
-    let window = winman::Window::new("1.10 Camera", 1920, 1080)?;
+    let window = winman::Window::new("1.10-camera", 1920, 1080)?;
 
     let asset_dir = std::env::current_dir()?.join("assets");
     let image_dir = asset_dir.join("images");
