@@ -20,23 +20,52 @@ impl<const N: usize> TryFrom<&[[f32; N]]> for Mesh {
             _ => anyhow::bail!("Invalid Buffer Size"),
         };
 
-        let vertex_array = VertexArray::new();
-        let mut vertex_buffer = Buffer::new(BufferTarget::Array);
+        let indices: Option<&[()]> = None;
+        let instances: Option<(&[()], &[BufferAttribute])> = None;
 
+        Mesh::new(vertices, &[(0, attribute_size).into()], indices, instances)
+    }
+}
+
+impl Mesh {
+    pub fn new<Vertex, Index, Instance>(
+        vertices: &[Vertex],
+        vertex_layout: &[BufferAttribute],
+        indices: Option<&[Index]>,
+        instances: Option<(&[Instance], &[BufferAttribute])>,
+    ) -> anyhow::Result<Self> {
+        let vertex_array = VertexArray::new();
         vertex_array.bind()?;
-        vertex_buffer.bind(vertices, &[(0, attribute_size).into()])?;
+
+        let mut vertex_buffer = Buffer::new(BufferTarget::Array);
+        vertex_buffer.bind(vertices, vertex_layout)?;
+
+        let index_buffer = if let Some(indices) = indices {
+            let mut index_buffer = Buffer::new(BufferTarget::ElementArray);
+            index_buffer.bind(indices, Default::default())?;
+            Some(index_buffer)
+        } else {
+            None
+        };
+
+        let instance_buffer = if let Some((instances, layout)) = instances {
+            let mut instance_buffer = Buffer::new(BufferTarget::ElementArray);
+            instance_buffer.bind(instances, layout)?;
+            Some(instance_buffer)
+        } else {
+            None
+        };
+
         opengl_sys::bind_vertex_array(0)?;
 
         Ok(Mesh {
             vertex_array,
             vertex_buffer,
-            index_buffer: None,
-            instance_buffer: None,
+            index_buffer,
+            instance_buffer,
         })
     }
-}
 
-impl Mesh {
     pub fn draw(&self, draw_mode: DrawMode) -> anyhow::Result<()> {
         self.vertex_array.bind()?;
 
