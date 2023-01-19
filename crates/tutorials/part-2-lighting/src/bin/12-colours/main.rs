@@ -15,6 +15,7 @@ fn main() -> anyhow::Result<()> {
 
     #[rustfmt::skip]
         let vertices = [
+        // front
         [-0.5f32, -0.5, 0.5],
         [-0.5, 0.5, 0.5],
         [0.5, 0.5, 0.5],
@@ -22,6 +23,7 @@ fn main() -> anyhow::Result<()> {
         [0.5, 0.5, 0.5],
         [0.5, -0.5, 0.5],
 
+        // left
         [-0.5, -0.5, -0.5],
         [-0.5, 0.5, -0.5],
         [-0.5, 0.5, 0.5],
@@ -29,6 +31,7 @@ fn main() -> anyhow::Result<()> {
         [-0.5, 0.5, 0.5],
         [-0.5, -0.5, 0.5],
 
+        // top
         [-0.5, 0.5, 0.5],
         [-0.5, 0.5, -0.5],
         [0.5, 0.5, -0.5],
@@ -36,6 +39,7 @@ fn main() -> anyhow::Result<()> {
         [0.5, 0.5, -0.5],
         [0.5, 0.5, 0.5],
 
+        // right
         [0.5, -0.5, 0.5],
         [0.5, 0.5, 0.5],
         [0.5, 0.5, -0.5],
@@ -43,6 +47,7 @@ fn main() -> anyhow::Result<()> {
         [0.5, 0.5, -0.5],
         [0.5, -0.5, -0.5],
 
+        // bottom
         [0.5, -0.5, 0.5],
         [0.5, -0.5, -0.5],
         [-0.5, -0.5, -0.5],
@@ -50,6 +55,7 @@ fn main() -> anyhow::Result<()> {
         [-0.5, -0.5, -0.5],
         [-0.5, -0.5, 0.5],
 
+        // back
         [0.5, -0.5, -0.5],
         [0.5, 0.5, -0.5],
         [-0.5, 0.5, -0.5],
@@ -63,7 +69,7 @@ fn main() -> anyhow::Result<()> {
     let mut camera = camera::Camera::new();
     let mut camera_controls = camera::Controls::default();
 
-    camera.set_position(&[0.0, 0.0, 3.0]);
+    camera.set_position(&[1.5, 1.8, 5.0]);
 
     object_shader_program.enable()?;
     let object_model_location = object_shader_program.locate_uniform("model")?;
