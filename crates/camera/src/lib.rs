@@ -56,6 +56,10 @@ impl Camera {
         self.position = glm::vec3(position[0], position[1], position[2]);
     }
 
+    pub fn get_position(&self) -> [f32; 3] {
+        [self.position.x, self.position.y, self.position.z]
+    }
+
     pub fn move_position(
         &mut self,
         acceleration: glm::Vec3,
