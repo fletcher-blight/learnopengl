@@ -60,6 +60,10 @@ impl Camera {
         [self.position.x, self.position.y, self.position.z]
     }
 
+    pub fn get_direction(&self) -> [f32; 3] {
+        [self.front.x, self.front.y, self.front.z]
+    }
+
     pub fn move_position(
         &mut self,
         acceleration: glm::Vec3,
