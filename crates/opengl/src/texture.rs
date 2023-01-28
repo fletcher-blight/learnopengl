@@ -1,9 +1,9 @@
-use opengl_sys::DataType;
-use crate::shader::*;
 use crate::error::*;
-use std::path::Path;
-use image::DynamicImage;
+use crate::shader::*;
 use anyhow::Context;
+use image::DynamicImage;
+use opengl_sys::DataType;
+use std::path::Path;
 
 pub trait TextureType {
     fn bind(&self) -> anyhow::Result<()>;
@@ -44,6 +44,15 @@ impl TextureImage2D {
         P: AsRef<Path>,
     {
         let (image, format) = load_image(texture_filename, true)?;
+        Self::load_from_memory(image.as_bytes(), format, image.width(), image.height())
+    }
+
+    pub fn load_from_memory(
+        data: &[u8],
+        format: opengl_sys::TextureFormat,
+        width: u32,
+        height: u32,
+    ) -> anyhow::Result<Self> {
         let texture = Self {
             id: opengl_sys::create_texture(),
         };
@@ -73,11 +82,11 @@ impl TextureImage2D {
             opengl_sys::TextureTarget::Image2D,
             0,
             opengl_sys::TextureFormat::RGB,
-            image.width() as _,
-            image.height() as _,
+            width as _,
+            height as _,
             format,
             DataType::U8,
-            image.as_bytes(),
+            data,
         )?;
         opengl_sys::generate_mipmaps(opengl_sys::TextureTarget::Image2D)?;
 

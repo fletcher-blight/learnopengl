@@ -6,23 +6,5 @@ members = [
     "crates/playground",
     "crates/tutorials/part-1-getting-started",
     "crates/tutorials/part-2-lighting",
+    "crates/tutorials/part-3-model-loading",
 ]
-
-#[package]
-#name = "learnopengl"
-#version = "0.1.0"
-#edition = "2021"
-#
-#[dependencies]
-#anyhow = "1.0"
-#thiserror = "1.0"
-#env_logger = "0.10"
-#log = "0.4"
-#
-#assimp = "0.3"
-#assimp-sys = "0.3"
-#nalgebra-glm = "0.17"
-#gl = "0.14"
-#sdl2 = { version = "0.35", features = ["bundled", "static-link"] }
-#image = "0.24"
-#rand = "0.8"

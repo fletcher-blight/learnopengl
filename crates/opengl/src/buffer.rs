@@ -29,7 +29,7 @@ impl Drop for VertexArray {
 pub struct Buffer {
     id: opengl_sys::BufferID,
     target: BufferTarget,
-    pub(crate) size: u64,
+    size: u64,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -102,6 +102,10 @@ impl Buffer {
         }
 
         Ok(())
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
     }
 }
 

@@ -73,23 +73,23 @@ impl Mesh {
             if let Some(ebo) = &self.index_buffer {
                 opengl_sys::draw_elements_instanced(
                     draw_mode,
-                    ebo.size,
+                    ebo.size(),
                     DataType::U32,
-                    ibo.size as _,
+                    ibo.size() as _,
                 )?;
             } else {
                 opengl_sys::draw_arrays_instanced(
                     draw_mode,
                     0,
-                    self.vertex_buffer.size,
-                    ibo.size as _,
+                    self.vertex_buffer.size(),
+                    ibo.size() as _,
                 )?;
             }
         } else {
             if let Some(ebo) = &self.index_buffer {
-                opengl_sys::draw_elements(draw_mode, ebo.size, DataType::U32)?;
+                opengl_sys::draw_elements(draw_mode, ebo.size(), DataType::U32)?;
             } else {
-                opengl_sys::draw_arrays(draw_mode, 0, self.vertex_buffer.size)?;
+                opengl_sys::draw_arrays(draw_mode, 0, self.vertex_buffer.size())?;
             }
         }
 
