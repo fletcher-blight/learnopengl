@@ -83,7 +83,7 @@ fn main() -> anyhow::Result<()> {
         opengl_sys::clear(opengl_sys::BufferBit::Depth).unwrap();
 
         object_shader_program.enable().unwrap();
-        opengl_sys::set_uniform_vec3(flavour_location, &[0.0, 1.0, 0.0]).unwrap();
+        opengl_sys::set_uniform_vec3(flavour_location, &[1.0, 0.5, 0.0]).unwrap();
         opengl_sys::frame_buffer_texture_2d(
             opengl_sys::FrameBufferTarget::All,
             opengl_sys::FrameBufferAttachment::Colour(0),
