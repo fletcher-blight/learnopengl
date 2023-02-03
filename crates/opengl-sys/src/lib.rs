@@ -620,7 +620,7 @@ pub fn load_texture_image2d<Data>(
     height: u64,
     data_format: TextureFormat,
     data_type: DataType,
-    data: &[Data],
+    data: Option<&[Data]>,
 ) -> Result<(), Error> {
     let internal_format: GLenum = internal_format.into();
     unsafe {
@@ -633,7 +633,7 @@ pub fn load_texture_image2d<Data>(
             0,
             data_format.into(),
             data_type.into(),
-            data.as_ptr() as _,
+            data.map_or(std::ptr::null(), |bytes| bytes.as_ptr()) as _,
         )
     };
     assert_no_error()
@@ -695,6 +695,173 @@ impl From<TextureFormat> for GLenum {
         match value {
             TextureFormat::RGB => gl::RGB,
             TextureFormat::RGBA => gl::RGBA,
+        }
+    }
+}
+
+pub type FrameBufferID = GLuint;
+
+pub fn create_frame_buffer() -> FrameBufferID {
+    let mut id = 0;
+    unsafe {
+        gl::GenFramebuffers(1, &mut id);
+    }
+    id
+}
+
+pub enum FrameBufferTarget {
+    All,
+    Read,
+    Draw,
+}
+
+pub fn bind_frame_buffer(id: FrameBufferID, target: FrameBufferTarget) -> Result<(), Error> {
+    unsafe { gl::BindFramebuffer(target.into(), id) };
+    assert_no_error()
+}
+
+pub enum FrameBufferAttachment {
+    Colour(u32),
+    DepthStencil,
+}
+
+pub fn frame_buffer_texture_2d(
+    framebuffer_target: FrameBufferTarget,
+    attachment: FrameBufferAttachment,
+    texture_target: TextureTarget,
+    texture_id: TextureID,
+    mipmap_level: u32,
+) -> Result<(), Error> {
+    unsafe {
+        gl::FramebufferTexture2D(
+            framebuffer_target.into(),
+            attachment.into(),
+            texture_target.into(),
+            texture_id,
+            mipmap_level as _,
+        )
+    };
+    assert_no_error()
+}
+
+impl From<FrameBufferTarget> for GLenum {
+    fn from(value: FrameBufferTarget) -> Self {
+        match value {
+            FrameBufferTarget::All => gl::FRAMEBUFFER,
+            FrameBufferTarget::Read => gl::READ_FRAMEBUFFER,
+            FrameBufferTarget::Draw => gl::DRAW_FRAMEBUFFER,
+        }
+    }
+}
+
+impl From<FrameBufferAttachment> for GLenum {
+    fn from(value: FrameBufferAttachment) -> Self {
+        match value {
+            FrameBufferAttachment::Colour(index) => gl::COLOR_ATTACHMENT0 + index,
+            FrameBufferAttachment::DepthStencil => gl::DEPTH_STENCIL_ATTACHMENT,
+        }
+    }
+}
+
+pub type RenderBufferID = GLuint;
+
+pub fn create_render_buffer() -> RenderBufferID {
+    let mut id = 0;
+    unsafe { gl::GenRenderbuffers(1, &mut id) };
+    id
+}
+
+pub fn bind_render_buffer(id: RenderBufferID) -> Result<(), Error> {
+    unsafe { gl::BindRenderbuffer(gl::RENDERBUFFER, id) };
+    assert_no_error()
+}
+
+pub enum RenderBufferStorageFormat {
+    Depth24Stencil8,
+}
+
+pub fn render_buffer_storage(
+    internal_format: RenderBufferStorageFormat,
+    width: u32,
+    height: u32,
+) -> Result<(), Error> {
+    unsafe {
+        gl::RenderbufferStorage(
+            gl::RENDERBUFFER,
+            internal_format.into(),
+            width as _,
+            height as _,
+        )
+    };
+    assert_no_error()
+}
+
+impl From<RenderBufferStorageFormat> for GLenum {
+    fn from(value: RenderBufferStorageFormat) -> Self {
+        match value {
+            RenderBufferStorageFormat::Depth24Stencil8 => gl::DEPTH24_STENCIL8,
+        }
+    }
+}
+
+pub fn frame_buffer_render_buffer(
+    target: FrameBufferTarget,
+    attachment: FrameBufferAttachment,
+    render_buffer_id: RenderBufferID,
+) -> Result<(), Error> {
+    unsafe {
+        gl::FramebufferRenderbuffer(
+            target.into(),
+            attachment.into(),
+            gl::RENDERBUFFER,
+            render_buffer_id,
+        )
+    };
+    assert_no_error()
+}
+
+pub enum Feature {
+    DepthTest,
+}
+
+pub fn enable(feature: Feature) -> Result<(), Error> {
+    unsafe { gl::Enable(feature.into()) };
+    assert_no_error()
+}
+
+pub fn disable(feature: Feature) -> Result<(), Error> {
+    unsafe { gl::Disable(feature.into()) };
+    assert_no_error()
+}
+
+impl From<Feature> for GLenum {
+    fn from(value: Feature) -> Self {
+        match value {
+            Feature::DepthTest => gl::DEPTH_TEST,
+        }
+    }
+}
+
+pub enum BufferBit {
+    Colour,
+    Depth,
+}
+
+pub fn clear(buffer: BufferBit) -> Result<(), Error> {
+    unsafe { gl::Clear(buffer.into()) };
+    assert_no_error()
+}
+
+pub fn clear_colour(r: f32, g: f32, b: f32, a: f32) -> Result<(), Error> {
+    unsafe { gl::ClearColor(r, g, b, a) };
+    assert_no_error()
+}
+
+impl From<BufferBit> for GLenum {
+    fn from(value: BufferBit) -> Self {
+        match value {
+            BufferBit::Colour => gl::COLOR_BUFFER_BIT,
+            BufferBit::Depth => gl::DEPTH_BUFFER_BIT,
         }
     }
 }

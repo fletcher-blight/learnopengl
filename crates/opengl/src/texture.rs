@@ -86,7 +86,7 @@ impl TextureImage2D {
             height as _,
             format,
             DataType::U8,
-            data,
+            Some(data),
         )?;
         opengl_sys::generate_mipmaps(opengl_sys::TextureTarget::Image2D)?;
 
@@ -188,7 +188,7 @@ impl TextureCubeMap {
                 image.height() as _,
                 format,
                 DataType::U8,
-                image.as_bytes(),
+                Some(image.as_bytes()),
             )?;
         }
 

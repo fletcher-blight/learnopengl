@@ -7,4 +7,5 @@ members = [
     "crates/tutorials/part-1-getting-started",
     "crates/tutorials/part-2-lighting",
     "crates/tutorials/part-3-model-loading",
+    "crates/tutorials/part-4-advanced-opengl",
 ]
